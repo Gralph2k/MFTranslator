@@ -47,6 +47,9 @@ class Trainer:
         self.faces_dir = faces_dir
         self.sessions: dict[int, DialogueSession] = {}
         self._scenarios: dict[str, Scenario] = {default_scenario.id: default_scenario}
+        # Telegram хранит загруженный файл у себя: второй раз шлём по file_id,
+        # иначе каждый ход тратит время на загрузку полумегабайтной картинки.
+        self.face_file_ids: dict[str, str] = {}
 
     def scenario_by_id(self, scenario_id: str) -> Scenario:
         if scenario_id not in self._scenarios:
@@ -129,11 +132,20 @@ async def _send_face(message: Message, trainer: "Trainer", state: Any, caption: 
     """Лицо под текущее настроение. False — если картинки нет, текст отправит вызывающий."""
     if trainer.faces_dir is None:
         return False
+
     emotion = emotion_for_state(state)
+    cached = trainer.face_file_ids.get(emotion)
+    if cached is not None:
+        await message.answer_photo(cached, caption=caption[:1024])
+        return True
+
     path = face_path(emotion, trainer.faces_dir)
     if path is None:
         return False
-    await message.answer_photo(FSInputFile(path), caption=caption[:1024])
+
+    sent = await message.answer_photo(FSInputFile(path), caption=caption[:1024])
+    if sent.photo:
+        trainer.face_file_ids[emotion] = sent.photo[-1].file_id
     return True
 
 
@@ -273,7 +285,13 @@ async def on_text(message: Message) -> None:
         return
 
     trainer.persist(message.from_user.id, session)
-    await _send_long(message, f"{trainer.scenario.persona.name}: {reply}")
+    reply_text = f"{session.scenario.persona.name}: {reply}"
+    if len(reply_text) > 1024:
+        # Не влезает в подпись к фото — шлём картинку и текст отдельно.
+        await _send_face(message, trainer, session.state, "")
+        await _send_long(message, reply_text)
+    elif not await _send_face(message, trainer, session.state, reply_text):
+        await _send_long(message, reply_text)
 
     if session.is_over:
         await message.answer("Она закрыла тему. Когда будешь готов — /finish.")
