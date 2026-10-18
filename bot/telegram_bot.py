@@ -268,7 +268,7 @@ async def on_text(message: Message) -> None:
         return
     if session.is_over:
         await message.answer(
-            "Этот разговор закончен. Разбор — /finish, новый — /restart."
+            "Этот разговор закончен. Новый — /restart или /menu."
         )
         return
 
@@ -296,10 +296,8 @@ async def on_text(message: Message) -> None:
         await _send_long(message, reply_text)
 
     if session.is_over:
-        await message.answer(
-            "Она закрыла тему. Разбор — /finish, или начни сразу:",
-            reply_markup=after_finish_menu(session.scenario.id),
-        )
+        # Сюжет закончился (кончились ходы или персонаж закрыл тему) — разбираем сразу.
+        await _deliver_debrief(message, trainer, message.from_user.id, session)
 
 
 @router.callback_query(F.data.startswith("menu:"))
