@@ -12,6 +12,8 @@ from bot.state import PersonaState
         ("на глазах слёзы", {}, "tears"),
         ("плачет", {}, "tears"),
         ("улыбается", {}, "smiling"),
+        ("смеётся", {}, "laughing"),
+        ("настороженная, цепкая", {}, "guarded"),
         ("обижена", {}, "hurt"),
         ("теплеет", {}, "warming"),
         ("раздражение под усталостью", {}, "irritated"),
@@ -33,8 +35,12 @@ def test_emotion_is_case_and_yo_insensitive():
 
 
 def test_every_emotion_has_a_picture():
-    """Пользователь положил картинки в images/ — они должны находиться по имени."""
-    missing = [emotion for emotion in EMOTIONS if face_path(emotion) is None]
+    """Все эмоции должны иметь собственный файл в images/."""
+    missing = [
+        emotion
+        for emotion in EMOTIONS
+        if face_path(emotion) is None or not face_path(emotion).stem.endswith(emotion)
+    ]
     assert not missing, f"нет картинок для: {missing}"
 
 
@@ -54,4 +60,14 @@ def test_unknown_emotion_has_no_file():
 
 def test_labels_are_russian():
     assert label("tears") == "на глазах слёзы"
+    assert label("guarded") == "насторожена"
     assert label("неизвестно") == "неизвестно"
+
+
+def test_missing_emotion_uses_closest_face():
+    """Если файла эмоции нет, берётся ближайшая по смыслу картинка."""
+    folder = DEFAULT_FACES_DIR.parent / ".tmp" / "faces-fallback"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "smiling.jpg").write_bytes(b"")
+
+    assert face_path("laughing", folder) == folder / "smiling.jpg"

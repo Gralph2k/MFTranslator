@@ -111,6 +111,23 @@ raised, lips trembling slightly and slightly parted, chin lowered, restrained �
 no sobbing, no exaggerated drama.
 ```
 
+### 9. Настороженная — `guarded`
+Ждёт подвоха: проверяет, цепляется за детали.
+
+```
+guarded and watchful: eyes slightly narrowed and fixed on the viewer, eyebrows drawn
+together with the inner ends a little raised, lips pressed and turned down at the corners,
+chin lowered, head turned away by a few degrees, shoulders tense.
+```
+
+### 10. Смеётся — `laughing`
+Стало легко, шутка попала.
+
+```
+laughing openly: eyes closed in happy crescents, head tilted back slightly, mouth open
+in a genuine laugh, cheeks raised, faint blush on the cheeks.
+```
+
 ## Настройки и запреты
 
 - Соотношение сторон: **1:1**, размер 1024×1024.

@@ -19,8 +19,10 @@ EMOTIONS: tuple[str, ...] = (
     "irritated",
     "hurt",
     "closed",
+    "guarded",
     "warming",
     "smiling",
+    "laughing",
     "tears",
 )
 
@@ -30,9 +32,17 @@ LABELS: dict[str, str] = {
     "irritated": "раздражена",
     "hurt": "обижена",
     "closed": "закрылась",
+    "guarded": "насторожена",
     "warming": "теплеет",
     "smiling": "улыбается",
+    "laughing": "смеётся",
     "tears": "на глазах слёзы",
+}
+
+# Пока для эмоции нет картинки, показываем ближайшую по смыслу.
+FALLBACKS: dict[str, tuple[str, ...]] = {
+    "guarded": ("closed", "calm"),
+    "laughing": ("smiling",),
 }
 
 _EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
@@ -52,8 +62,12 @@ def emotion_for_state(state: PersonaState) -> str:
 
     if _has(mood, "слез", "плач", "плак", "рыда", "ревет"):
         return "tears"
-    if _has(mood, "улыб", "радост", "смех", "смеет", "весел"):
+    if _has(mood, "смех", "смешн", "хохоч", "смеет"):
+        return "laughing"
+    if _has(mood, "улыб", "радост", "весел"):
         return "smiling"
+    if _has(mood, "насторож", "недовер", "подозр", "цепк"):
+        return "guarded"
     if _has(mood, "обид", "обиж", "ранен", "задет", "унижен"):
         return "hurt"
     if _has(mood, "тепл"):
@@ -73,7 +87,15 @@ def emotion_for_state(state: PersonaState) -> str:
 
 
 def face_path(emotion: str, directory: Path | str = DEFAULT_FACES_DIR) -> Path | None:
-    """Ищет файл эмоции. Имена — anya_<emotion>.jpg, имя персонажа не важно."""
+    """Ищет файл эмоции, при отсутствии — ближайшую по смыслу замену."""
+    for candidate in (emotion, *FALLBACKS.get(emotion, ())):
+        found = _exact_face(candidate, directory)
+        if found is not None:
+            return found
+    return None
+
+
+def _exact_face(emotion: str, directory: Path | str) -> Path | None:
     directory = Path(directory)
     if not directory.exists():
         return None
