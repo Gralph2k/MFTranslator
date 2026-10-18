@@ -1,0 +1,32 @@
+[project]
+name = "emotion-trainer"
+version = "0.1.0"
+description = "Telegram-тренажёр эмоционального интеллекта: диалог с персонажем и разбор по рубрике"
+requires-python = ">=3.12"
+dependencies = [
+    "aiogram>=3.13,<4",
+    "aiohttp-socks>=0.8",
+    "httpx[socks]>=0.27,<1",
+    "python-dotenv>=1.0,<2",
+    "truststore>=0.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["bot"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+# В этой среде %TEMP% закрыт песочницей, поэтому тесты создают файлы внутри проекта,
+# а кэш pytest отключён: он тоже пытается писать в недоступные места.
+addopts = "-p no:cacheprovider"

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+data/
+.tmp/
+.uv-cache/
+.idea/
+pytest-cache-files-*/
+.pytest_cache/
