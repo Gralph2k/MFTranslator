@@ -11,12 +11,13 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.exceptions import TelegramNetworkError, TelegramUnauthorizedError
 from aiogram.filters import Command, CommandStart
-from aiogram.types import FSInputFile, Message
+from aiogram.types import CallbackQuery, FSInputFile, Message
 
 from .config import Settings, load_settings
 from .engine import DialogueEngine, DialogueSession
 from .faces import emotion_for_state, face_path, label
 from .llm import DeepSeekLLM, LLM
+from .menus import after_finish_menu, scenario_title, scenarios_menu
 from .prompts import intro_text
 from .safety import CrisisDetected, safety_message
 from .scenario import Scenario, ScenarioError, available_scenarios, load_scenario
@@ -151,14 +152,32 @@ async def _send_face(message: Message, trainer: "Trainer", state: Any, caption: 
 
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
-    trainer = _trainer(message)
-    session = trainer.start_session(message.from_user.id)
-    trainer.persist(message.from_user.id, session)
-    await _send_long(message, intro_text(session.scenario))
+    await _begin(message, _trainer(message), message.from_user.id)
 
+
+async def _begin(
+    target: Message,
+    trainer: "Trainer",
+    telegram_id: int,
+    scenario_id: str | None = None,
+) -> None:
+    """Начинает сценарий и присылает вступление с первой репликой."""
+    try:
+        session = trainer.start_session(telegram_id, scenario_id)
+    except ScenarioError:
+        await target.answer("Такого сценария нет. /scenario — список.")
+        return
+
+    trainer.persist(telegram_id, session)
+    await _send_long(target, intro_text(session.scenario))
     opening = f"{session.scenario.persona.name}: {session.scenario.opening}"
-    if not await _send_face(message, trainer, session.state, opening):
-        await message.answer(opening)
+    if not await _send_face(target, trainer, session.state, opening):
+        await target.answer(opening)
+
+
+@router.message(Command("menu"))
+async def cmd_menu(message: Message) -> None:
+    await message.answer("Что делаем?", reply_markup=scenarios_menu())
 
 
 @router.message(Command("scenario"))
@@ -167,38 +186,18 @@ async def cmd_scenario(message: Message) -> None:
     parts = (message.text or "").split(maxsplit=1)
 
     if len(parts) == 1:
-        current = trainer.get_session(message.from_user.id)
-        current_id = current.scenario.id if current is not None else trainer.default_scenario.id
-        listing = "\n".join(
-            f"{'→ ' if name == current_id else '• '}{name}" for name in available_scenarios()
-        )
-        await message.answer(f"Сценарии:\n{listing}\n\nСменить: /scenario <id>")
+        await message.answer("Выбери сценарий:", reply_markup=scenarios_menu())
         return
 
-    scenario_id = parts[1].strip()
-    try:
-        session = trainer.start_session(message.from_user.id, scenario_id)
-    except ScenarioError:
-        await message.answer(
-            "Такого сценария нет. Есть: " + ", ".join(available_scenarios())
-        )
-        return
-
-    trainer.persist(message.from_user.id, session)
-    await _send_long(message, intro_text(session.scenario))
-    opening = f"{session.scenario.persona.name}: {session.scenario.opening}"
-    if not await _send_face(message, trainer, session.state, opening):
-        await message.answer(opening)
+    await _begin(message, trainer, message.from_user.id, parts[1].strip())
 
 
 @router.message(Command("restart"))
 async def cmd_restart(message: Message) -> None:
     trainer = _trainer(message)
-    session = trainer.start_session(message.from_user.id)
-    trainer.persist(message.from_user.id, session)
-    await message.answer(
-        f"Начинаем заново. {session.scenario.persona.name}: {session.scenario.opening}"
-    )
+    current = trainer.get_session(message.from_user.id)
+    scenario_id = current.scenario.id if current is not None else None
+    await _begin(message, trainer, message.from_user.id, scenario_id)
 
 
 @router.message(Command("state"))
@@ -211,7 +210,7 @@ async def cmd_state(message: Message) -> None:
     state = session.state
     emotion = emotion_for_state(state)
     text = (
-        f"Аня сейчас: {label(emotion)}.\n"
+        f"{session.scenario.persona.name} сейчас: {label(emotion)}.\n"
         f"Доверие — {state.trust:.0%}, готовность говорить — {state.openness:.0%}, "
         f"силы — {state.energy:.0%}.\n"
         f"Осталось ходов: {session.turns_left}."
@@ -228,29 +227,32 @@ async def cmd_finish(message: Message) -> None:
         await message.answer("Разбирать пока нечего: сначала поговори с ней. /start")
         return
 
-    await message.answer("Секунду, собираю разбор...")
+    await _deliver_debrief(message, trainer, message.from_user.id, session)
+
+
+async def _deliver_debrief(
+    target: Message,
+    trainer: "Trainer",
+    telegram_id: int,
+    session: DialogueSession,
+) -> None:
+    await target.answer("Секунду, собираю разбор...")
     try:
         debrief = await trainer.engine.debrief(session)
     except Exception as exc:
         log.exception("debrief failed")
-        await message.answer(f"Разбор не получился: {exc}. Попробуй ещё раз позже.")
+        await target.answer(f"Разбор не получился: {exc}. Попробуй ещё раз позже.")
         return
 
     text = debrief.render(session.scenario)
-    trainer.persist(message.from_user.id, session)
+    trainer.persist(telegram_id, session)
     if session.session_id is not None:
         trainer.storage.save_debrief(session.session_id, text)
-    await _send_face(message, trainer, session.state, "Так она закончила разговор.")
-    await _send_long(message, text)
-    await message.answer("Начать новый разговор: /restart")
-
-
-@router.message(Command("delete"))
-async def cmd_delete(message: Message) -> None:
-    trainer = _trainer(message)
-    trainer.sessions.pop(message.from_user.id, None)
-    trainer.storage.delete_user(message.from_user.id)
-    await message.answer("История удалена. Начать заново: /start")
+    await _send_face(target, trainer, session.state, "Так она закончила разговор.")
+    await _send_long(target, text)
+    await target.answer(
+        "Что дальше?", reply_markup=after_finish_menu(session.scenario.id)
+    )
 
 
 @router.message(F.text)
@@ -294,7 +296,25 @@ async def on_text(message: Message) -> None:
         await _send_long(message, reply_text)
 
     if session.is_over:
-        await message.answer("Она закрыла тему. Когда будешь готов — /finish.")
+        await message.answer(
+            "Она закрыла тему. Разбор — /finish, или начни сразу:",
+            reply_markup=after_finish_menu(session.scenario.id),
+        )
+
+
+@router.callback_query(F.data.startswith("menu:"))
+async def on_menu(callback: CallbackQuery) -> None:
+    trainer = _trainer(callback.message)
+    await callback.answer()
+
+    action = (callback.data or "").split(":", 1)[1]
+    if action == "list":
+        await callback.message.answer("Выбери сценарий:", reply_markup=scenarios_menu())
+        return
+    if action.startswith("start:"):
+        await _begin(
+            callback.message, trainer, callback.from_user.id, action.split(":", 1)[1]
+        )
 
 
 async def _run(settings: Settings, scenario: Scenario) -> None:
