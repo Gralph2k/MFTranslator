@@ -1,6 +1,7 @@
 from bot.menus import (
     after_finish_menu,
     next_scenario_id,
+    scenario_pick,
     scenario_title,
     scenario_titles,
     scenarios_menu,
@@ -37,3 +38,14 @@ def test_scenarios_menu_lists_all_scenarios():
     callbacks = _callbacks(scenarios_menu())
     assert len(callbacks) == len(scenario_titles())
     assert all(data.startswith("menu:start:") for data in callbacks)
+
+
+def test_first_date_goes_first_in_the_menu():
+    """`order` в сценарии задаёт место в списке: первое свидание — первым."""
+    assert list(scenario_titles())[0] == "first_date"
+
+
+def test_pick_button_opens_the_list():
+    markup = scenario_pick()
+    assert _callbacks(markup) == ["menu:list"]
+    assert markup.inline_keyboard[0][0].text == "Выбор сценария"

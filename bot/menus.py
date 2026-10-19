@@ -24,6 +24,19 @@ def next_scenario_id(current: str) -> str:
     return ids[(ids.index(current) + 1) % len(ids)]
 
 
+def scenario_pick() -> InlineKeyboardMarkup:
+    """Одна кнопка «Выбор сценария»: раскрывает список.
+
+    Нужна после случайного старта: человек видит, что сценарий выбран за него,
+    и может поменять его одним нажатием, не вспоминая команд.
+    """
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Выбор сценария", callback_data="menu:list")]
+        ]
+    )
+
+
 def scenarios_menu() -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text=title, callback_data=f"menu:start:{scenario_id}")]

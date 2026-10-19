@@ -6,6 +6,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 SCALES = ("trust", "openness", "energy")
+# Доверие и открытость растут медленно: один тёплый ход не переписывает историю.
+# Числа совпадают с правилами в промпте наблюдателя, но здесь они ещё и зажаты.
+MAX_GROWTH = {"trust": 0.1, "openness": 0.15, "energy": 0.05}
 MAX_NOTES = 8
 
 
@@ -54,7 +57,11 @@ class PersonaState:
             self.mood = delta["mood"].strip()
         for scale in SCALES:
             if scale in delta:
-                setattr(self, scale, _clamp(delta[scale], getattr(self, scale)))
+                current = getattr(self, scale)
+                value = _clamp(delta[scale], current)
+                if value > current:
+                    value = min(value, current + MAX_GROWTH[scale])
+                setattr(self, scale, value)
         new_notes = delta.get("notes")
         if isinstance(new_notes, list):
             for note in new_notes:

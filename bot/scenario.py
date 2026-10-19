@@ -9,6 +9,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 SCENARIO_DIR = ROOT / "scenarios"
+SCENARIO_FILE = "scenario.json"
+IMAGES_DIR = "images"
 
 
 class ScenarioError(ValueError):
@@ -39,6 +41,7 @@ class Scenario:
     title: str
     language: str
     one_liner: str
+    backstory: str
     opening: str
     persona: Persona
     situation: str
@@ -49,10 +52,25 @@ class Scenario:
     hurts: list[str]
     rubric: list[RubricItem]
     debrief_tone: str
+    # Рамка разговора: кто они друг другу и что это за сцена. Без неё промпт
+    # описывал бы только пару, живущую вместе, и врал бы про первое свидание.
+    frame: str = ""
+    # Что значит «шаг к нему» именно здесь: дома это объятие, в кофейне — продолжение.
+    contact_hint: str = ""
+    # Подсказка игроку на первый ход: она зависит от сцены, а не от движка.
+    hint: str = ""
+    # Папка сценария: рядом со scenario.json лежит images/ с лицом персонажа.
+    dir: Path = SCENARIO_DIR
+    # Порядок в меню: меньшее число — раньше. По умолчанию все равны.
+    order: int = 100
 
     @property
     def max_score(self) -> int:
         return sum(item.max for item in self.rubric)
+
+    @property
+    def faces_dir(self) -> Path:
+        return self.dir / IMAGES_DIR
 
 
 def _require(data: dict[str, Any], key: str, kind: type, where: str) -> Any:
@@ -64,7 +82,8 @@ def _require(data: dict[str, Any], key: str, kind: type, where: str) -> Any:
     return value
 
 
-def scenario_from_dict(data: dict[str, Any]) -> Scenario:
+def scenario_from_dict(data: dict[str, Any], directory: Path | None = None) -> Scenario:
+    """Собирает сценарий из JSON. `directory` — папка, где лежит его images/."""
     if not isinstance(data, dict):
         raise ScenarioError("сценарий должен быть объектом JSON")
 
@@ -98,6 +117,7 @@ def scenario_from_dict(data: dict[str, Any]) -> Scenario:
         title=_require(data, "title", str, "сценарий"),
         language=data.get("language", "ru"),
         one_liner=_require(data, "one_liner", str, "сценарий"),
+        backstory=str(data.get("backstory") or data.get("situation", "")),
         opening=_require(data, "opening", str, "сценарий"),
         persona=persona,
         situation=_require(data, "situation", str, "сценарий"),
@@ -108,14 +128,34 @@ def scenario_from_dict(data: dict[str, Any]) -> Scenario:
         hurts=list(_require(levers, "hurts", list, "levers")),
         rubric=rubric,
         debrief_tone=data.get("debrief_tone", "спокойно и по делу"),
+        frame=str(data.get("frame") or "").strip(),
+        contact_hint=str(data.get("contact_hint") or "").strip(),
+        hint=str(data.get("hint") or "").strip(),
+        dir=directory or SCENARIO_DIR / str(data.get("id") or ""),
+        order=_as_int(data.get("order"), 100),
     )
 
 
-def load_scenario(name_or_path: str | Path = "friday_evening") -> Scenario:
-    """Загружает сценарий по имени (без .json) или по пути к файлу."""
+def _as_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _scenario_file(name_or_path: str | Path) -> Path:
+    """Приводит имя, папку или путь к файлу к пути scenario.json."""
     path = Path(name_or_path)
-    if not path.exists():
-        path = SCENARIO_DIR / f"{path.name}.json"
+    if path.is_dir():
+        return path / SCENARIO_FILE
+    if path.suffix == ".json":
+        return path
+    return SCENARIO_DIR / path.name / SCENARIO_FILE
+
+
+def load_scenario(name_or_path: str | Path = "friday_evening") -> Scenario:
+    """Загружает сценарий по id, по папке или по пути к scenario.json."""
+    path = _scenario_file(name_or_path)
     if not path.exists():
         raise ScenarioError(f"сценарий не найден: {name_or_path}")
 
@@ -124,8 +164,10 @@ def load_scenario(name_or_path: str | Path = "friday_evening") -> Scenario:
     except json.JSONDecodeError as exc:
         raise ScenarioError(f"{path.name}: битый JSON — {exc}") from exc
 
-    return scenario_from_dict(data)
+    return scenario_from_dict(data, path.parent)
 
 
 def available_scenarios() -> list[str]:
-    return sorted(p.stem for p in SCENARIO_DIR.glob("*.json"))
+    """Id сценариев в порядке показа: сначала `order`, при равенстве — по имени."""
+    names = [p.parent.name for p in SCENARIO_DIR.glob(f"*/{SCENARIO_FILE}")]
+    return sorted(names, key=lambda name: (load_scenario(name).order, name))

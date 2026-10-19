@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     history_json TEXT NOT NULL,
     user_turns INTEGER NOT NULL DEFAULT 0,
     finished INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    updated_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS debriefs (
@@ -56,6 +57,23 @@ class StoredSession:
     history: list[dict[str, str]]
     user_turns: int
     finished: bool
+    created_at: str
+    updated_at: str | None
+
+
+@dataclass
+class SessionOverview:
+    """Строка списка сессий: без стенограммы, зато с пользователем и оценкой."""
+
+    id: int
+    user_id: int
+    telegram_id: int
+    scenario: str
+    created_at: str
+    updated_at: str | None
+    user_turns: int
+    finished: bool
+    debrief: str | None
 
 
 class Storage:
@@ -69,7 +87,27 @@ class Storage:
         self._conn.execute("PRAGMA foreign_keys = ON")
         with self._lock:
             self._conn.executescript(SCHEMA)
+            self._migrate()
             self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Доводит старую базу до текущей схемы, не теряя диалоги."""
+        columns = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(sessions)")
+        }
+        if "updated_at" in columns:
+            return
+        self._conn.execute("ALTER TABLE sessions ADD COLUMN updated_at TEXT")
+        # Для старых строк время последнего хода не сохранялось: берём разбор,
+        # а если его нет — момент начала, чтобы список не падал на NULL.
+        self._conn.execute(
+            """UPDATE sessions
+               SET updated_at = COALESCE(
+                   (SELECT MAX(created_at) FROM debriefs
+                    WHERE debriefs.session_id = sessions.id),
+                   created_at)
+               WHERE updated_at IS NULL"""
+        )
 
     def close(self) -> None:
         with self._lock:
@@ -97,12 +135,14 @@ class Storage:
         history: list[dict[str, str]],
     ) -> int:
         with self._lock:
+            now = _now()
             cursor = self._conn.execute(
                 """INSERT INTO sessions
-                   (user_id, scenario_id, state_json, history_json, user_turns, finished, created_at)
-                   VALUES (?, ?, ?, ?, 0, 0, ?)""",
+                   (user_id, scenario_id, state_json, history_json, user_turns, finished,
+                    created_at, updated_at)
+                   VALUES (?, ?, ?, ?, 0, 0, ?, ?)""",
                 (user_id, scenario_id, json.dumps(state, ensure_ascii=False),
-                 json.dumps(history, ensure_ascii=False), _now()),
+                 json.dumps(history, ensure_ascii=False), now, now),
             )
             self._conn.commit()
             return int(cursor.lastrowid)
@@ -118,11 +158,12 @@ class Storage:
         with self._lock:
             self._conn.execute(
                 """UPDATE sessions
-                   SET state_json = ?, history_json = ?, user_turns = ?, finished = ?
+                   SET state_json = ?, history_json = ?, user_turns = ?, finished = ?,
+                       updated_at = ?
                    WHERE id = ?""",
                 (json.dumps(state, ensure_ascii=False),
                  json.dumps(history, ensure_ascii=False),
-                 user_turns, int(finished), session_id),
+                 user_turns, int(finished), _now(), session_id),
             )
             self._conn.commit()
 
@@ -150,6 +191,29 @@ class Storage:
                 "SELECT * FROM sessions WHERE user_id = ? ORDER BY id", (user_id,)
             ).fetchall()
         return [_row_to_session(row) for row in rows]
+
+    def list_overview(self, limit: int | None = None) -> list[SessionOverview]:
+        """Все сессии для просмотра: новые сверху, с последним разбором."""
+        query = _OVERVIEW_SQL + " ORDER BY s.id DESC"
+        params: tuple[int, ...] = ()
+        if limit is not None:
+            query += " LIMIT ?"
+            params = (limit,)
+        with self._lock:
+            rows = self._conn.execute(query, params).fetchall()
+        return [_row_to_overview(row) for row in rows]
+
+    def count_sessions(self) -> int:
+        with self._lock:
+            row = self._conn.execute("SELECT COUNT(*) AS total FROM sessions").fetchone()
+        return int(row["total"])
+
+    def get_overview(self, session_id: int) -> SessionOverview | None:
+        with self._lock:
+            row = self._conn.execute(
+                _OVERVIEW_SQL + " WHERE s.id = ?", (session_id,)
+            ).fetchone()
+        return _row_to_overview(row) if row is not None else None
 
     def save_debrief(self, session_id: int, payload: str) -> None:
         with self._lock:
@@ -191,4 +255,29 @@ def _row_to_session(row: sqlite3.Row) -> StoredSession:
         history=json.loads(row["history_json"]),
         user_turns=int(row["user_turns"]),
         finished=bool(row["finished"]),
+        created_at=str(row["created_at"]),
+        updated_at=row["updated_at"],
+    )
+
+
+_OVERVIEW_SQL = """
+SELECT s.id, s.user_id, u.telegram_id, s.scenario_id, s.created_at, s.updated_at,
+       s.user_turns, s.finished,
+       (SELECT d.payload FROM debriefs d
+        WHERE d.session_id = s.id ORDER BY d.id DESC LIMIT 1) AS debrief
+FROM sessions s JOIN users u ON u.id = s.user_id
+"""
+
+
+def _row_to_overview(row: sqlite3.Row) -> SessionOverview:
+    return SessionOverview(
+        id=int(row["id"]),
+        user_id=int(row["user_id"]),
+        telegram_id=int(row["telegram_id"]),
+        scenario=str(row["scenario_id"]),
+        created_at=str(row["created_at"]),
+        updated_at=row["updated_at"],
+        user_turns=int(row["user_turns"]),
+        finished=bool(row["finished"]),
+        debrief=str(row["debrief"]) if row["debrief"] is not None else None,
     )

@@ -1,7 +1,7 @@
 """Выбор иллюстрации по состоянию персонажа.
 
-Картинки — данные: лежат в images/ с именами вроде anya_calm.jpg.
-Если файла нет, бот просто не отправляет фото и работает дальше.
+Картинки — данные: лежат в папке сценария, `scenarios/<id>/images/`, с именами
+вроде `calm.jpg`. Если файла нет, бот просто не отправляет фото и работает дальше.
 """
 
 from __future__ import annotations
@@ -9,9 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from .state import PersonaState
-
-ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_FACES_DIR = ROOT / "images"
 
 EMOTIONS: tuple[str, ...] = (
     "calm",
@@ -86,8 +83,12 @@ def emotion_for_state(state: PersonaState) -> str:
     return "calm"
 
 
-def face_path(emotion: str, directory: Path | str = DEFAULT_FACES_DIR) -> Path | None:
-    """Ищет файл эмоции, при отсутствии — ближайшую по смыслу замену."""
+def face_path(emotion: str, directory: Path | str) -> Path | None:
+    """Ищет файл эмоции в наборе персонажа, при отсутствии — ближайшую замену.
+
+    Набор у каждого сценария свой, поэтому папка обязательна: общий `images/`
+    больше не смешивает лица разных героинь.
+    """
     for candidate in (emotion, *FALLBACKS.get(emotion, ())):
         found = _exact_face(candidate, directory)
         if found is not None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 from pathlib import Path
 from typing import Any
 
@@ -15,10 +16,11 @@ from aiogram.types import CallbackQuery, FSInputFile, Message
 
 from .config import Settings, load_settings
 from .engine import DialogueEngine, DialogueSession
-from .faces import emotion_for_state, face_path, label
+from .faces import emotion_for_state, face_path
+from .launcher import clear_pid, write_pid
 from .llm import DeepSeekLLM, LLM
-from .menus import after_finish_menu, scenario_title, scenarios_menu
-from .prompts import intro_text
+from .menus import after_finish_menu, scenario_pick, scenario_title, scenarios_menu
+from .prompts import backstory_text, rules_text
 from .safety import CrisisDetected, safety_message
 from .scenario import Scenario, ScenarioError, available_scenarios, load_scenario
 from .state import PersonaState
@@ -39,13 +41,14 @@ class Trainer:
         storage: Storage,
         default_scenario: Scenario,
         safety_resources: str | None = None,
-        faces_dir: Path | None = None,
+        with_faces: bool = True,
     ) -> None:
         self.engine = engine
         self.storage = storage
         self.default_scenario = default_scenario
         self.safety_resources = safety_resources
-        self.faces_dir = faces_dir
+        # Фото — часть сценария; флаг нужен тестам, чтобы не звать Telegram.
+        self.with_faces = with_faces
         self.sessions: dict[int, DialogueSession] = {}
         self._scenarios: dict[str, Scenario] = {default_scenario.id: default_scenario}
         # Telegram хранит загруженный файл у себя: второй раз шлём по file_id,
@@ -129,30 +132,40 @@ async def _send_long(message: Message, text: str) -> None:
         text = text[cut:].lstrip("\n")
 
 
-async def _send_face(message: Message, trainer: "Trainer", state: Any, caption: str) -> bool:
+async def _send_face(message: Message, trainer: "Trainer", session: Any, caption: str) -> bool:
     """Лицо под текущее настроение. False — если картинки нет, текст отправит вызывающий."""
-    if trainer.faces_dir is None:
+    if not trainer.with_faces:
         return False
 
-    emotion = emotion_for_state(state)
-    cached = trainer.face_file_ids.get(emotion)
+    emotion = emotion_for_state(session.state)
+    # Кеш по паре «сценарий:эмоция»: у каждой героини своё лицо.
+    key = f"{session.scenario.id}:{emotion}"
+    cached = trainer.face_file_ids.get(key)
     if cached is not None:
         await message.answer_photo(cached, caption=caption[:1024])
         return True
 
-    path = face_path(emotion, trainer.faces_dir)
+    path = face_path(emotion, session.scenario.faces_dir)
     if path is None:
         return False
 
     sent = await message.answer_photo(FSInputFile(path), caption=caption[:1024])
     if sent.photo:
-        trainer.face_file_ids[emotion] = sent.photo[-1].file_id
+        trainer.face_file_ids[key] = sent.photo[-1].file_id
     return True
 
 
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
-    await _begin(message, _trainer(message), message.from_user.id)
+    trainer = _trainer(message)
+    # Старт без выбора: сценарий берётся случайно, чтобы не приедался один и тот же.
+    await _begin(
+        message,
+        trainer,
+        message.from_user.id,
+        random.choice(available_scenarios()),
+        random_pick=True,
+    )
 
 
 async def _begin(
@@ -160,19 +173,28 @@ async def _begin(
     trainer: "Trainer",
     telegram_id: int,
     scenario_id: str | None = None,
+    random_pick: bool = False,
 ) -> None:
     """Начинает сценарий и присылает вступление с первой репликой."""
     try:
         session = trainer.start_session(telegram_id, scenario_id)
     except ScenarioError:
-        await target.answer("Такого сценария нет. /scenario — список.")
+        await target.answer("Такого сценария нет. /menu — список.")
         return
 
     trainer.persist(telegram_id, session)
-    await _send_long(target, intro_text(session.scenario))
+    await _send_long(target, rules_text(session.scenario))
+    await _send_long(target, backstory_text(session.scenario))
     opening = f"{session.scenario.persona.name}: {session.scenario.opening}"
-    if not await _send_face(target, trainer, session.state, opening):
+    if not await _send_face(target, trainer, session, opening):
         await target.answer(opening)
+
+    if random_pick:
+        await target.answer(
+            f"Сценарий выбран случайно: «{session.scenario.title}». "
+            f"Другой можно выбрать здесь:",
+            reply_markup=scenario_pick(),
+        )
 
 
 @router.message(Command("menu"))
@@ -196,27 +218,13 @@ async def cmd_scenario(message: Message) -> None:
 async def cmd_restart(message: Message) -> None:
     trainer = _trainer(message)
     current = trainer.get_session(message.from_user.id)
-    scenario_id = current.scenario.id if current is not None else None
-    await _begin(message, trainer, message.from_user.id, scenario_id)
-
-
-@router.message(Command("state"))
-async def cmd_state(message: Message) -> None:
-    trainer = _trainer(message)
-    session = trainer.get_session(message.from_user.id)
-    if session is None:
-        await message.answer("Сейчас нет активного диалога. Начни с /start.")
-        return
-    state = session.state
-    emotion = emotion_for_state(state)
-    text = (
-        f"{session.scenario.persona.name} сейчас: {label(emotion)}.\n"
-        f"Доверие — {state.trust:.0%}, готовность говорить — {state.openness:.0%}, "
-        f"силы — {state.energy:.0%}.\n"
-        f"Осталось ходов: {session.turns_left}."
+    # Без активной сессии повтор — это новый старт, а не возврат к умолчанию.
+    scenario_id = (
+        current.scenario.id
+        if current is not None
+        else random.choice(available_scenarios())
     )
-    if not await _send_face(message, trainer, state, text):
-        await message.answer(text)
+    await _begin(message, trainer, message.from_user.id, scenario_id)
 
 
 @router.message(Command("finish"))
@@ -225,6 +233,9 @@ async def cmd_finish(message: Message) -> None:
     session = trainer.get_session(message.from_user.id)
     if session is None or session.user_turns == 0:
         await message.answer("Разбирать пока нечего: сначала поговори с ней. /start")
+        return
+    if session.debrief_sent:
+        await message.answer("Разбор уже был выше. Новый разговор — /restart.")
         return
 
     await _deliver_debrief(message, trainer, message.from_user.id, session)
@@ -248,7 +259,8 @@ async def _deliver_debrief(
     trainer.persist(telegram_id, session)
     if session.session_id is not None:
         trainer.storage.save_debrief(session.session_id, text)
-    await _send_face(target, trainer, session.state, "Так она закончила разговор.")
+    session.debrief_sent = True
+    await _send_face(target, trainer, session, "Так она закончила разговор.")
     await _send_long(target, text)
     await target.answer(
         "Что дальше?", reply_markup=after_finish_menu(session.scenario.id)
@@ -290,9 +302,9 @@ async def on_text(message: Message) -> None:
     reply_text = f"{session.scenario.persona.name}: {reply}"
     if len(reply_text) > 1024:
         # Не влезает в подпись к фото — шлём картинку и текст отдельно.
-        await _send_face(message, trainer, session.state, "")
+        await _send_face(message, trainer, session, "")
         await _send_long(message, reply_text)
-    elif not await _send_face(message, trainer, session.state, reply_text):
+    elif not await _send_face(message, trainer, session, reply_text):
         await _send_long(message, reply_text)
 
     if session.is_over:
@@ -343,10 +355,14 @@ async def _run(settings: Settings, scenario: Scenario) -> None:
         storage,
         scenario,
         settings.safety_resources,
-        settings.faces_dir,
     )
     global _trainer_instance
     _trainer_instance = trainer
+    # PID-файл — чтобы следующий run-bot мог закрыть именно этот процесс.
+    try:
+        write_pid()
+    except OSError as exc:
+        log.warning("не записал PID-файл: %s", exc)
 
     log.info("Бот запущен, сценарий: %s", scenario.title)
     try:
@@ -361,6 +377,7 @@ async def _run(settings: Settings, scenario: Scenario) -> None:
             f"затем проверьте: python -m bot.doctor. Подробности: {exc}"
         ) from None
     finally:
+        clear_pid()
         await llm.aclose()
         storage.close()
         await bot.session.close()

@@ -1,11 +1,14 @@
+import json
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from bot import telegram_bot
 from bot.engine import DialogueEngine
 from bot.llm import FakeLLM
-from bot.scenario import load_scenario
+from bot.scenario import available_scenarios, load_scenario
 from bot.storage import Storage
 from bot.telegram_bot import Trainer
 
@@ -22,7 +25,7 @@ def store():
 
 
 def _trainer(storage) -> Trainer:
-    return Trainer(DialogueEngine(FakeLLM([])), storage, load_scenario())
+    return Trainer(DialogueEngine(FakeLLM([])), storage, load_scenario(), with_faces=False)
 
 
 def test_session_id_is_stored_on_the_session(store):
@@ -79,3 +82,85 @@ def test_unknown_scenario_is_rejected(store):
     trainer = _trainer(store)
     with pytest.raises(Exception):
         trainer.start_session(telegram_id=6, scenario_id="нет_такого")
+
+
+DEBRIEF = json.dumps(
+    {
+        "scores": {
+            "noticing": 2,
+            "questions": 1,
+            "validation": 1,
+            "no_rescuing": 2,
+            "self_expression": 1,
+            "care_offer": 1,
+        },
+        "summary": "Ты заметил и не стал давить.",
+        "strengths": ["Ты назвал её состояние вслух."],
+        "growth": ["Меньше вопросов подряд."],
+        "moments": [],
+        "rewrite": {"original": "Успокойся", "better": "Я рядом."},
+        "next_time": "Назвать чувство и замолчать.",
+    },
+    ensure_ascii=False,
+)
+
+
+class FakeMessage:
+    """Минимальный Message: хендлеру нужны text, from_user.id и answer()."""
+
+    def __init__(self, text: str, user_id: int = 1) -> None:
+        self.text = text
+        self.from_user = SimpleNamespace(id=user_id)
+        self.sent: list[str] = []
+
+    async def answer(self, text: str, **kwargs) -> None:
+        self.sent.append(text)
+
+
+async def test_start_picks_a_random_scenario(store, monkeypatch):
+    """`/start` без выбора берёт случайный сценарий и предлагает поменять."""
+    trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    monkeypatch.setattr(telegram_bot.random, "choice", lambda items: "first_date")
+
+    message = FakeMessage("/start")
+    await telegram_bot.cmd_start(message)
+
+    session = trainer.get_session(1)
+    assert session is not None
+    assert session.scenario.id == "first_date"
+    assert session.scenario.id in available_scenarios()
+    assert any("случайно" in text for text in message.sent)
+
+
+async def test_debrief_arrives_as_soon_as_turns_run_out(store, monkeypatch):
+    llm = FakeLLM(["Ладно.", json.dumps({"trust": 0.5}), DEBRIEF])
+    trainer = Trainer(DialogueEngine(llm), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+
+    session = trainer.start_session(telegram_id=1)
+    session.user_turns = session.scenario.turn_limit - 1
+    message = FakeMessage("Я рядом.")
+
+    await telegram_bot.on_text(message)
+
+    assert session.finished is True
+    assert any("Разбор" in text for text in message.sent)
+    assert store.last_debrief(store.ensure_user(1)) is not None
+
+
+async def test_finish_does_not_repeat_an_automatic_debrief(store, monkeypatch):
+    llm = FakeLLM(["Ладно.", json.dumps({"trust": 0.5}), DEBRIEF])
+    trainer = Trainer(DialogueEngine(llm), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+
+    session = trainer.start_session(telegram_id=1)
+    session.user_turns = session.scenario.turn_limit - 1
+    await telegram_bot.on_text(FakeMessage("Я рядом."))
+
+    message = FakeMessage("/finish")
+    await telegram_bot.cmd_finish(message)
+
+    assert any("уже" in text.lower() for text in message.sent)
+    # Второй разбор не записан и лишний запрос к модели не ушёл.
+    assert len(llm.calls) == 3

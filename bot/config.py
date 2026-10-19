@@ -22,7 +22,6 @@ class Settings:
     deepseek_model: str
     db_path: Path
     safety_resources: str | None
-    faces_dir: Path
 
     @property
     def has_llm(self) -> bool:
@@ -52,10 +51,6 @@ def load_settings(env_file: Path | None = None) -> Settings:
     if not db_path.is_absolute():
         db_path = ROOT / db_path
 
-    faces_dir = Path(os.getenv("FACES_DIR", "./images"))
-    if not faces_dir.is_absolute():
-        faces_dir = ROOT / faces_dir
-
     return Settings(
         telegram_bot_token=_clean(os.getenv("TELEGRAM_BOT_TOKEN")),
         telegram_proxy=_clean(os.getenv("TELEGRAM_PROXY")),
@@ -64,5 +59,4 @@ def load_settings(env_file: Path | None = None) -> Settings:
         deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
         db_path=db_path,
         safety_resources=_clean(os.getenv("SAFETY_RESOURCES")),
-        faces_dir=faces_dir,
     )

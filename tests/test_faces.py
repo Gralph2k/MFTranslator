@@ -1,9 +1,20 @@
+import uuid
 from pathlib import Path
 
 import pytest
 
-from bot.faces import DEFAULT_FACES_DIR, EMOTIONS, emotion_for_state, face_path, label
+from bot.faces import EMOTIONS, emotion_for_state, face_path, label
+from bot.scenario import available_scenarios, load_scenario
 from bot.state import PersonaState
+
+# %TEMP% в этой среде закрыт песочницей, поэтому фикстуру tmp_path не используем.
+TMP_ROOT = Path(__file__).resolve().parent.parent / ".tmp"
+
+
+def _folder(name: str) -> Path:
+    folder = TMP_ROOT / f"faces-{name}-{uuid.uuid4().hex[:8]}"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
 
 
 @pytest.mark.parametrize(
@@ -34,28 +45,35 @@ def test_emotion_is_case_and_yo_insensitive():
     assert emotion_for_state(PersonaState(mood="слёзы")) == "tears"
 
 
-def test_every_emotion_has_a_picture():
-    """Все эмоции должны иметь собственный файл в images/."""
-    missing = [
-        emotion
-        for emotion in EMOTIONS
-        if face_path(emotion) is None or not face_path(emotion).stem.endswith(emotion)
-    ]
-    assert not missing, f"нет картинок для: {missing}"
+def test_faces_live_next_to_the_scenario():
+    """Фотографии — часть сценария, а не общая папка на всех."""
+    for name in available_scenarios():
+        scenario = load_scenario(name)
+        assert scenario.dir.name == name
+        assert scenario.faces_dir == scenario.dir / "images"
 
 
-def test_face_path_returns_existing_file():
-    path = face_path("calm")
-    assert path is not None and path.exists()
-    assert path.parent == DEFAULT_FACES_DIR
+@pytest.mark.parametrize("name", ["friday_evening", "reunion_call"])
+def test_every_emotion_has_a_picture(name):
+    """У сценариев с готовым набором есть файл на каждую эмоцию."""
+    scenario = load_scenario(name)
+    missing = [emotion for emotion in EMOTIONS if face_path(emotion, scenario.faces_dir) is None]
+    assert not missing, f"{name}: нет картинок для {missing}"
+
+
+def test_scenario_without_photos_falls_back_to_text():
+    """Пока у Веры нет кадров, бот просто не шлёт фото — это не ошибка."""
+    folder = _folder("empty")
+    assert face_path("calm", folder) is None
 
 
 def test_missing_directory_is_not_an_error():
-    assert face_path("calm", DEFAULT_FACES_DIR.parent / "нет-такой-папки") is None
+    assert face_path("calm", TMP_ROOT / "нет-такой-папки") is None
 
 
 def test_unknown_emotion_has_no_file():
-    assert face_path("восторг") is None
+    scenario = load_scenario("friday_evening")
+    assert face_path("восторг", scenario.faces_dir) is None
 
 
 def test_labels_are_russian():
@@ -66,8 +84,7 @@ def test_labels_are_russian():
 
 def test_missing_emotion_uses_closest_face():
     """Если файла эмоции нет, берётся ближайшая по смыслу картинка."""
-    folder = DEFAULT_FACES_DIR.parent / ".tmp" / "faces-fallback"
-    folder.mkdir(parents=True, exist_ok=True)
+    folder = _folder("fallback")
     (folder / "smiling.jpg").write_bytes(b"")
 
     assert face_path("laughing", folder) == folder / "smiling.jpg"

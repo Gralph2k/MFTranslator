@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from typing import Any
@@ -12,9 +13,13 @@ from typing import Any
 from .config import Settings, load_settings
 from .engine import DialogueEngine
 from .llm import DeepSeekLLM, LLM
-from .prompts import intro_text
+from .prompts import backstory_text, rules_text
 from .safety import CrisisDetected, safety_message
 from .scenario import load_scenario
+
+# Строка рубрики в промпте методиста: «- noticing («Заметил состояние», 0..2): ...».
+# По ней демо-режим собирает баллы под тот сценарий, который играют, а не под один зашитый.
+_RUBRIC_ID = re.compile(r"^- ([a-z_]+) \(«", re.MULTILINE)
 
 
 @dataclass
@@ -40,11 +45,12 @@ class DemoLLM:
         self.calls.append({"messages": messages, "json_mode": json_mode})
         system = messages[0]["content"] if messages else ""
         if "методист" in system:
-            return self.debrief
+            ids = _RUBRIC_ID.findall(system)
+            return _demo_debrief(ids) if ids else self.debrief
         if "наблюдатель" in system:
             return json.dumps(
                 {
-                    "mood": "усталость",
+                    "mood": "устала, но тянет к нему",
                     "trust": 0.55,
                     "openness": 0.25,
                     "energy": 0.2,
@@ -79,25 +85,44 @@ def build_llm(provider: str, settings: Settings) -> LLM:
 def _demo_replies() -> list[str]:
     """Заготовки реплик персонажа: показывают рост открытости."""
     return [
-        "Нормально всё, правда. Просто день был длинный.",
-        "Ну... неприятно вышло. Не хочу сейчас об этом.",
-        "Знаешь, да. Давай потом поужинаем, ладно?",
+        "Нормально всё. Правда. Ну... почти правда.",
+        "Не хочу сейчас об этом. Даже не из-за тебя, просто... не хочу.",
+        "Слушай, спасибо. Давай поужинаем, а? Только без вопросов пока.",
     ]
 
 
-def _demo_debrief() -> str:
+def _demo_debrief(rubric_ids: list[str] | None = None) -> str:
+    """Заготовка разбора: баллы — по пунктам того сценария, который играют.
+
+    Без списка пунктов остаётся набор «Пятничного вечера»: так функцию можно
+    вызывать в тестах, не поднимая сценарий.
+    """
+    ids = rubric_ids or [
+        "noticing",
+        "questions",
+        "validation",
+        "no_rescuing",
+        "self_expression",
+        "care_offer",
+    ]
+    scores = {item: 2 for item in ids}
+    if len(ids) > 1:
+        scores[ids[1]] = 1
+    if ids:
+        scores[ids[-1]] = 0
+
     payload = {
-        "scores": {"noticing": 2, "questions": 1, "validation": 1,
-                   "no_rescuing": 2, "self_expression": 1, "care_offer": 1},
-        "summary": "Ты заметил состояние и не стал давить — это сработало. "
-                   "Вопросов было многовато подряд.",
-        "strengths": ["Ты назвал её состояние вслух, а не сделал вид, что всё нормально."],
+        "scores": scores,
+        "summary": "Разговор шёл нормально, но ты несколько раз спешил: пауза после "
+                   "вопроса сработала бы лучше.",
+        "strengths": ["Ты заметил её состояние вслух, а не сделал вид, что всё в порядке."],
         "growth": ["Не задавай два вопроса подряд — после первого сделай паузу."],
-        "moments": [{"quote": "Ты не хочешь поговорить?",
-                     "why": "Вопрос хороший, но в связке со следующим он стал допросом."}],
-        "rewrite": {"original": "Ты не хочешь поговорить? Что случилось?",
-                    "better": "Ты не хочешь поговорить? Если нет — я просто посижу рядом."},
-        "next_time": "Сначала назвать чувство, потом задать один вопрос и замолчать.",
+        "moments": [{"quote": "Давай без плана, просто поговорим",
+                     "why": "Хорошее начало, но дальше ты снова перешёл к расспросам."}],
+        "rewrite": {"original": "Расслабься, всё нормально",
+                    "better": "Я вижу, что тебе не по себе. Хочешь — расскажешь, "
+                              "хочешь — просто посидим."},
+        "next_time": "Сначала назвать то, что замечаешь, потом задать один вопрос и замолчать.",
     }
     return json.dumps(payload, ensure_ascii=False)
 
@@ -110,7 +135,9 @@ async def run(provider: str, scenario_name: str) -> int:
     session = engine.start(scenario)
 
     print(f"=== {scenario.title} ===")
-    print(intro_text(scenario))
+    print(rules_text(scenario))
+    print()
+    print(backstory_text(scenario))
     print(f"\n{scenario.persona.name}: {scenario.opening}\n")
 
     interactive = sys.stdin.isatty()

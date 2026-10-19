@@ -27,6 +27,8 @@ class DialogueSession:
     user_turns: int = 0
     ended_by_persona: bool = False
     finished: bool = False
+    # Разбор уже отправлен: повторный /finish не должен тратить запрос и дублировать текст.
+    debrief_sent: bool = False
     # Номер сессии в базе: без него после перезапуска процесса некуда писать разбор.
     session_id: int | None = None
 

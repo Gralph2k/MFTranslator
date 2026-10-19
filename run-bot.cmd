@@ -6,7 +6,7 @@ cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 
 if not exist ".venv\Scripts\python.exe" (
-    echo [1/3] No virtual environment. Creating...
+    echo [1/4] No virtual environment. Creating...
     uv venv .venv --python 3.13
     uv pip install --python .venv -e ".[dev]"
     if errorlevel 1 goto :failed
@@ -17,7 +17,15 @@ if not exist ".env" (
     goto :end
 )
 
-echo [2/3] Environment check
+echo [2/4] Closing previous bot instance
+".venv\Scripts\python.exe" -m bot.launcher stop
+if errorlevel 1 (
+    echo.
+    echo Could not stop the previous bot. Close its window and try again.
+    goto :failed
+)
+
+echo [3/4] Environment check
 ".venv\Scripts\python.exe" -m bot.doctor
 if errorlevel 1 (
     echo.
@@ -25,7 +33,7 @@ if errorlevel 1 (
     echo.
 )
 
-echo [3/3] Starting bot. Stop with Ctrl+C.
+echo [4/4] Starting bot. Stop with Ctrl+C.
 ".venv\Scripts\python.exe" -m bot.telegram_bot
 echo.
 echo Bot stopped.
