@@ -117,20 +117,18 @@ class FakeMessage:
         self.sent.append(text)
 
 
-async def test_start_picks_a_random_scenario(store, monkeypatch):
-    """`/start` без выбора берёт случайный сценарий и предлагает поменять."""
+async def test_start_opens_the_first_scenario(store, monkeypatch):
+    """`/start` открывает первый сценарий обучения, а не случайный."""
     trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
     monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
-    monkeypatch.setattr(telegram_bot.random, "choice", lambda items: "first_date")
 
     message = FakeMessage("/start")
     await telegram_bot.cmd_start(message)
 
     session = trainer.get_session(1)
     assert session is not None
-    assert session.scenario.id == "first_date"
-    assert session.scenario.id in available_scenarios()
-    assert any("случайно" in text for text in message.sent)
+    assert session.scenario.id == available_scenarios()[0] == "first_message"
+    assert any("тренажёр" in text.lower() for text in message.sent)
 
 
 async def test_debrief_arrives_as_soon_as_turns_run_out(store, monkeypatch):

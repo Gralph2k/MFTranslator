@@ -46,3 +46,30 @@ def test_first_date_is_about_a_first_meeting_not_a_long_relationship():
     assert "караоке" in text
     assert "клава" not in text
     assert "одноклассниц" not in text
+
+
+def test_first_message_is_about_the_app_chat_not_the_meeting():
+    """Переписка до свидания: та же Вера, но ещё ни разу не виделись вживую."""
+    scenario = load_scenario("first_message")
+    text = _text(scenario)
+
+    assert "приложени" in text
+    assert "переписыва" in text or "матч" in text
+    assert "сальса" in text or "анкет" in text
+    assert "клава" not in text
+    assert "одноклассниц" not in text
+    # Это не свидание: в кафе они ещё не сидели.
+    assert "кофейн" not in text
+
+
+def test_first_call_is_about_the_phone_call_not_the_meeting():
+    """Созвон после переписки: уже не переписка, но ещё не свидание."""
+    scenario = load_scenario("first_call")
+    text = _text(scenario)
+
+    assert "созвон" in text or "телефон" in text
+    assert "приложени" in text
+    assert "клава" not in text
+    assert "одноклассниц" not in text
+    # Это не свидание: в кофейне они ещё не сидели вместе.
+    assert "кофейне" not in text

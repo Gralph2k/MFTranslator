@@ -16,6 +16,7 @@ def test_titles_cover_every_scenario():
     titles = scenario_titles()
     assert "friday_evening" in titles
     assert "reunion_call" in titles
+    assert "first_message" in titles
     assert scenario_title("friday_evening") == "Пятничный вечер"
 
 
@@ -40,9 +41,18 @@ def test_scenarios_menu_lists_all_scenarios():
     assert all(data.startswith("menu:start:") for data in callbacks)
 
 
-def test_first_date_goes_first_in_the_menu():
-    """`order` в сценарии задаёт место в списке: первое свидание — первым."""
-    assert list(scenario_titles())[0] == "first_date"
+def test_first_message_goes_first_in_the_menu():
+    """`order` задаёт место в списке: обучение начинается с первой переписки."""
+    assert list(scenario_titles())[0] == "first_message"
+
+
+def test_call_goes_between_the_chat_and_the_date():
+    """Прогрессия: переписка в приложении, созвон, потом первое свидание."""
+    assert list(scenario_titles())[:3] == [
+        "first_message",
+        "first_call",
+        "first_date",
+    ]
 
 
 def test_pick_button_opens_the_list():

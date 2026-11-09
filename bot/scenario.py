@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +25,23 @@ class Persona:
     relation: str
     traits: list[str]
     speech: str
+
+
+@dataclass(frozen=True)
+class Profile:
+    """Анкета из приложения знакомств: то, что игрок видит до первой реплики.
+
+    Наличие анкеты — это признак переписки: бот показывает карточку до хода
+    игрока и не предлагает описывать действия вроде «протягиваю цветок».
+    """
+
+    about: str
+    hobbies: list[str]
+    interests: list[str]
+    photos: list[str]
+    # Подписи под конкретным фото: работа и «о себе» на первом, интересы
+    # на втором, чего ищет — на третьем. Так текст не дублируется блоком «О себе».
+    captions: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -57,8 +74,20 @@ class Scenario:
     frame: str = ""
     # Что значит «шаг к нему» именно здесь: дома это объятие, в кофейне — продолжение.
     contact_hint: str = ""
-    # Подсказка игроку на первый ход: она зависит от сцены, а не от движка.
-    hint: str = ""
+    # Навык одним предложением: что именно тренирует сценарий.
+    skill: str = ""
+    # Анкета из приложения знакомств. Есть анкета — значит переписка, а не встреча.
+    profile: Profile | None = None
+    # Красные линии: за них персонаж может оборвать разговор и уйти.
+    red_flags: tuple[str, ...] = ()
+    # Как идёт разговор: "in_person" (видит лицо), "chat" (только текст) или
+    # "call" (только голос). В переписке и созвоне лицо показать нельзя.
+    medium: str = "in_person"
+    # Сценарий-продолжение: id сценария, переписка которого была до этой сцены.
+    # Бот подтягивает последнюю попытку игрока, а если её нет — канон.
+    continues: str = ""
+    # Канонная переписка: используется, если у игрока нет прошлой попытки.
+    canon_history: tuple[dict[str, str], ...] = ()
     # Папка сценария: рядом со scenario.json лежит images/ с лицом персонажа.
     dir: Path = SCENARIO_DIR
     # Порядок в меню: меньшее число — раньше. По умолчанию все равны.
@@ -71,6 +100,21 @@ class Scenario:
     @property
     def faces_dir(self) -> Path:
         return self.dir / IMAGES_DIR
+
+    @property
+    def is_correspondence(self) -> bool:
+        """Переписка в приложении: карточка анкеты и только текстовые сообщения."""
+        return self.medium == "chat"
+
+    @property
+    def is_call(self) -> bool:
+        """Созвон: лица нет, только голос, но и анкеты уже нет."""
+        return self.medium == "call"
+
+    @property
+    def shows_face(self) -> bool:
+        """Можно ли показывать её лицо. В переписке и на созвоне — нет."""
+        return self.medium == "in_person"
 
 
 def _require(data: dict[str, Any], key: str, kind: type, where: str) -> Any:
@@ -86,6 +130,10 @@ def scenario_from_dict(data: dict[str, Any], directory: Path | None = None) -> S
     """Собирает сценарий из JSON. `directory` — папка, где лежит его images/."""
     if not isinstance(data, dict):
         raise ScenarioError("сценарий должен быть объектом JSON")
+
+    opening = data.get("opening", "")
+    if not isinstance(opening, str):
+        raise ScenarioError("сценарий: поле 'opening' должно быть строкой")
 
     persona_raw = _require(data, "persona", dict, "сценарий")
     persona = Persona(
@@ -112,13 +160,25 @@ def scenario_from_dict(data: dict[str, Any], directory: Path | None = None) -> S
         for item in rubric_raw
     ]
 
+    profile = _profile(data.get("profile"))
+    medium = str(data.get("medium") or "").strip().lower()
+    if not medium:
+        medium = "chat" if profile is not None else "in_person"
+    if medium not in {"in_person", "chat", "call"}:
+        raise ScenarioError("сценарий: medium должен быть in_person, chat или call")
+    if medium == "chat" and profile is None:
+        raise ScenarioError("chat: нужна анкета (profile) — её видит игрок")
+
+    continues = str(data.get("continues") or "").strip()
+    canon_history = _history(data.get("canon_history"), "canon_history")
+
     return Scenario(
         id=_require(data, "id", str, "сценарий"),
         title=_require(data, "title", str, "сценарий"),
         language=data.get("language", "ru"),
         one_liner=_require(data, "one_liner", str, "сценарий"),
         backstory=str(data.get("backstory") or data.get("situation", "")),
-        opening=_require(data, "opening", str, "сценарий"),
+        opening=opening,
         persona=persona,
         situation=_require(data, "situation", str, "сценарий"),
         secrets=list(_require(data, "secrets", list, "сценарий")),
@@ -130,10 +190,80 @@ def scenario_from_dict(data: dict[str, Any], directory: Path | None = None) -> S
         debrief_tone=data.get("debrief_tone", "спокойно и по делу"),
         frame=str(data.get("frame") or "").strip(),
         contact_hint=str(data.get("contact_hint") or "").strip(),
-        hint=str(data.get("hint") or "").strip(),
+        skill=str(data.get("skill") or "").strip(),
+        profile=profile,
+        red_flags=tuple(_text_list(data.get("red_flags"), "сценарий")),
+        medium=medium,
+        continues=continues,
+        canon_history=tuple(canon_history),
         dir=directory or SCENARIO_DIR / str(data.get("id") or ""),
         order=_as_int(data.get("order"), 100),
     )
+
+
+def _text_list(value: Any, where: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ScenarioError(f"{where}: ожидался список строк")
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _history(value: Any, where: str) -> list[dict[str, str]]:
+    """Канонная переписка: только реплики user/assistant с осмысленным текстом."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ScenarioError(f"{where}: ожидался список реплик")
+
+    result: list[dict[str, str]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ScenarioError(f"{where}[{index}]: ожидался объект с role и content")
+        role = str(item.get("role") or "").strip()
+        content = str(item.get("content") or "").strip()
+        if role not in {"user", "assistant"}:
+            raise ScenarioError(f"{where}[{index}]: role должен быть user или assistant")
+        if not content:
+            raise ScenarioError(f"{where}[{index}]: пустая реплика")
+        result.append({"role": role, "content": content})
+    return result
+
+
+def _profile(raw: Any) -> Profile | None:
+    """Анкета необязательна: без неё сценарий остаётся сценой вживую."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ScenarioError("сценарий: поле 'profile' должно быть объектом")
+
+    photos = _text_list(raw.get("photos"), "profile")
+    if len(photos) < 3:
+        raise ScenarioError("profile: нужно минимум 3 фото анкеты")
+
+    about = str(raw.get("about") or "").strip()
+    if not about:
+        raise ScenarioError("profile: нужен текст о себе (about)")
+
+    return Profile(
+        about=about,
+        hobbies=_text_list(raw.get("hobbies"), "profile"),
+        interests=_text_list(raw.get("interests"), "profile"),
+        photos=photos,
+        captions=_captions(raw.get("captions")),
+    )
+
+
+def _captions(raw: Any) -> dict[str, str]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ScenarioError("profile: поле 'captions' должно быть объектом")
+    return {
+        str(name).strip(): str(text).strip()
+        for name, text in raw.items()
+        if str(name).strip() and str(text).strip()
+    }
 
 
 def _as_int(value: Any, default: int) -> int:

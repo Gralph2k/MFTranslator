@@ -31,6 +31,8 @@ class DialogueSession:
     debrief_sent: bool = False
     # Номер сессии в базе: без него после перезапуска процесса некуда писать разбор.
     session_id: int | None = None
+    # Переписка из сценария-продолжения: персонаж её помнит, и она попадает в промпт.
+    previous: list[dict[str, str]] = field(default_factory=list)
 
     @property
     def turns_left(self) -> int:
@@ -83,12 +85,20 @@ class DialogueEngine:
     def __init__(self, llm: LLM) -> None:
         self.llm = llm
 
-    def start(self, scenario: Scenario) -> DialogueSession:
+    def start(
+        self,
+        scenario: Scenario,
+        previous: list[dict[str, str]] | None = None,
+    ) -> DialogueSession:
         session = DialogueSession(
             scenario=scenario,
             state=PersonaState.from_mapping(scenario.initial_state),
+            previous=list(previous or []),
         )
-        session.history.append({"role": "assistant", "content": scenario.opening})
+        # В переписке первое сообщение пишет игрок: пустой opening — это команда
+        # движку начать с пустой стенограммы, а не отправить пустую реплику бота.
+        if scenario.opening.strip():
+            session.history.append({"role": "assistant", "content": scenario.opening})
         return session
 
     async def reply(self, session: DialogueSession, text: str) -> str:
@@ -105,7 +115,9 @@ class DialogueEngine:
             raise CrisisDetected(text)
 
         raw = await self.llm.complete(
-            persona_messages(session.scenario, session.state, session.history),
+            persona_messages(
+                session.scenario, session.state, session.history, session.previous
+            ),
             json_mode=False,
             temperature=0.85,
         )
@@ -147,7 +159,7 @@ class DialogueEngine:
             raise LLMError("разбирать нечего: пользователь ещё ничего не написал")
 
         raw = await self.llm.complete(
-            debrief_messages(session.scenario, session.history),
+            debrief_messages(session.scenario, session.history, session.previous),
             json_mode=True,
             temperature=0.3,
         )

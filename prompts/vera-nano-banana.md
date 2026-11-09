@@ -129,10 +129,16 @@ closed with a small closed-lip smile, gaze directly at the viewer.
 ### 2. Настороженная — `guarded`
 Главная эмоция сценария: он сказал что-то, и она взвешивает.
 ```
-guarded and watchful, weighing him: head tilted two or three degrees, one eyebrow clearly
-raised, eyes slightly narrowed and fixed on the viewer, lips closed and pressed at one
-corner, jaw set. Not hostile — appraising.
+guarded and watchful, weighing him — appraising, NOT angry: head tilted two or three
+degrees, ONE eyebrow raised while the other stays level, eyes calm and slightly narrowed,
+lips closed and relaxed with a faint downward pull at one corner. Do not pull both
+eyebrows down, do not frown, do not press the lips into a line, no vertical line between
+the eyebrows.
 ```
+
+Если на этом кадре получилось «злая» — модель свела обе брови и поджала губы.
+Переснимите: настороженность здесь в одной поднятой брови и спокойных глазах,
+а злость в набор не входит — для неё есть `irritated`.
 
 ### 3. Закрылась — `closed`
 Он давит или оценивает; она перестаёт вкладываться в разговор.

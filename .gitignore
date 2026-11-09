@@ -8,3 +8,7 @@ data/
 .idea/
 pytest-cache-files-*/
 .pytest_cache/
+# Служебные каталоги окружения разработки (DSH UI) и деплой-архивы.
+.tmp-dsh-ui*/
+^dsh/
+*.tgz

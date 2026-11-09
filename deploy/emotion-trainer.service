@@ -1,0 +1,20 @@
+[Unit]
+Description=Emotion trainer Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+Group=__SERVICE_USER__
+WorkingDirectory=__APP_DIR__
+Environment=PYTHONUNBUFFERED=1
+# Файлы, которые создаёт бот (база, кеш картинок), не должны быть доступны другим.
+UMask=0077
+ExecStart=__APP_DIR__/.venv/bin/python -m bot.telegram_bot
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

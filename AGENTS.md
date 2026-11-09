@@ -21,4 +21,13 @@ Telegram-бот, в котором пользователь переписыва
 - Секреты и токены — только в `.env`; файл в `.gitignore`.
 - **Пуш в GitHub — только по явной команде владельца.** Коммиты локально можно,
   `git push` — никогда без просьбы.
+- **Любое изменение кода, сценариев или конфигурации деплоится на VPS и перезапускает
+  бота.** «Локально работает» не значит «работает у пользователей»: боевой сервер —
+  `root@138.124.229.233`, код в `/opt/mf-translator`, сервис `emotion-trainer`.
+  Порядок обязателен: тесты → архив → `chown` → `pip install -e .` →
+  `systemctl restart emotion-trainer` → проверка `systemctl is-active` и
+  `journalctl -u emotion-trainer` (`Бот запущен`, `Run polling`, без `Traceback`
+  и `Conflict`). Команды — `deploy/DEPLOY.md`, §7. `.env` и `data/bot.db` на сервере
+  не перезаписываются (в архив не попадают), перед обновлением — бэкап
+  `deploy/backup.sh`.
 - Перед сдачей: `python -m pytest -q` и прогон `python -m bot.cli --provider demo --scenario <id>`.

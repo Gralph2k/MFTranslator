@@ -53,11 +53,14 @@ def test_backstory_is_separate_from_rules(scenario):
     backstory = backstory_text(scenario)
     rules = rules_text(scenario)
 
-    assert "тренажёр" in backstory.lower()
-    assert scenario.title in backstory
+    # Рамка «это тренажёр» — в первом сообщении; описание сцены уже без неё.
+    assert "тренажёр, а не живая женщина" in rules
+    assert "тренажёр" not in backstory.lower()
+    assert "Что происходит" in backstory
     assert scenario.backstory in backstory
 
     assert "Как играть" in rules
+    assert "Команды" in rules
     # Команда /state убрана из бота: нечего и подсказывать.
     assert "/state" not in rules
     assert scenario.backstory not in rules, "правила не должны пересказывать предысторию"
@@ -130,11 +133,13 @@ def test_frame_replaces_the_couple_only_intro(scenario):
     assert "Тебе сейчас нехорошо" not in prompt
 
 
-def test_rules_use_scenario_hint():
+def test_rules_have_no_first_move_hint():
+    """Подсказку на первый ход убрали: игрок должен сам заметить материал."""
     date = load_scenario("first_date")
-    assert date.hint in rules_text(date)
-    # Без своей подсказки сценарий получает общую.
-    assert "не угадывай" in rules_text(load_scenario("friday_evening"))
+    rules = rules_text(date)
+
+    assert "Подсказка" not in rules
+    assert "простой жест внимания" not in rules.lower()
 
 
 def test_persona_prompt_reflects_current_state(scenario):

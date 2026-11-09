@@ -1,0 +1,4 @@
+# Ежедневная резервная копия базы тренажёра.
+# Установка: sudo cp deploy/emotion-trainer-backup.cron /etc/cron.d/emotion-trainer-backup
+# Если APP_DIR другой — поправь путь в строке ниже.
+17 4 * * * root /opt/mf-translator/deploy/backup.sh >/dev/null 2>&1

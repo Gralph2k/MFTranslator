@@ -53,16 +53,16 @@ def test_faces_live_next_to_the_scenario():
         assert scenario.faces_dir == scenario.dir / "images"
 
 
-@pytest.mark.parametrize("name", ["friday_evening", "reunion_call"])
+@pytest.mark.parametrize("name", ["first_date", "friday_evening", "reunion_call"])
 def test_every_emotion_has_a_picture(name):
-    """У сценариев с готовым набором есть файл на каждую эмоцию."""
+    """У каждого сценария есть файл на каждую эмоцию."""
     scenario = load_scenario(name)
     missing = [emotion for emotion in EMOTIONS if face_path(emotion, scenario.faces_dir) is None]
     assert not missing, f"{name}: нет картинок для {missing}"
 
 
 def test_scenario_without_photos_falls_back_to_text():
-    """Пока у Веры нет кадров, бот просто не шлёт фото — это не ошибка."""
+    """Пустая папка — не ошибка: бот просто не шлёт фото."""
     folder = _folder("empty")
     assert face_path("calm", folder) is None
 

@@ -110,7 +110,88 @@ def state_guidance(state: PersonaState, scenario: Scenario | None = None) -> str
     )
 
 
-def persona_system_prompt(scenario: Scenario, state: PersonaState) -> str:
+def _correspondence_block(scenario: Scenario) -> str:
+    """Переписка — не сцена в комнате: только сообщения, и анкета уже увидена."""
+    if not scenario.is_correspondence:
+        return ""
+
+    lines = [
+        "Вы переписываетесь в приложении знакомств и пока не видели друг друга вживую.",
+        "Ты пишешь сообщения, а не говоришь вслух: можно ответить не сразу, оборвать "
+        "фразу, поставить точку и уйти из диалога.",
+        "Лица он не видит — только твой текст. Поэтому эмоция живёт в словах, а когда "
+        "она яркая — ещё и в смайлике.",
+    ]
+    if scenario.profile is not None:
+        lines.append(f"Твоя анкета, которую он видел: {scenario.profile.about}")
+    return "\n".join(lines) + "\n"
+
+
+def _call_block(scenario: Scenario) -> str:
+    """Созвон — не сцена в комнате: он не видит ни лица, ни жестов, только голос."""
+    if not scenario.is_call:
+        return ""
+
+    return (
+        "Вы говорите по телефону: он тебя не видит, у тебя только голос. Всё, что "
+        "раньше читалось по лицу и жестам, теперь звучит в словах.\n"
+        "Поэтому телефонная речь живая, а не телеграфная: паузы, «ну», «слушай», "
+        "«погоди», перебивание, недоговорённая мысль. Интонация живёт в знаках и "
+        "словах — многоточие, «да ладно», «а?», «стоп», — а не в ремарках.\n"
+        "Ты не диктор и не автоответчик. И не изображай телефон ради телефона: "
+        "никаких «алло-алло» и «ты меня слышишь?» в каждой реплике — связь нормальная.\n"
+        "Так на телефоне сухо — так не надо:\n"
+        "- «Нормально. Суббота подходит.» — отчёт, по нему слышно, что тебе всё равно.\n"
+        "- «Не знаю. Как хочешь.» — стена вместо усталости.\n"
+        "Так звучишь ты (тон, а не готовые реплики):\n"
+        "- «Суббота... ну, суббота у меня как раз свободна. Только без бара, ага?»\n"
+        "- «Погоди, ты сейчас серьёзно или так?»\n"
+        "- «Слушай... а ты вообще зачем звонишь?»\n"
+    )
+
+
+def _previous_chat_block(previous: list[dict[str, str]] | None) -> str:
+    """Переписка из сценария-продолжения: её помнит и персонаж, и разбор."""
+    if not previous:
+        return ""
+
+    lines = []
+    for message in previous:
+        who = "Он" if message.get("role") == "user" else "Ты"
+        lines.append(f"{who}: {message.get('content', '')}")
+    transcript = "\n".join(lines)
+    return (
+        "До этой сцены вы переписывались — вот что было (ты это помнишь, это ваши слова):\n"
+        f"{transcript}\n"
+        "Опирайся на переписку: что он писал, что ты отвечала, о чём договорились. "
+        "Если она оборвалась или закончилась неприятно — ты всё равно разговариваешь "
+        "сейчас, и это важнее прошлого.\n\n"
+    )
+
+
+def _red_flags_block(scenario: Scenario) -> str:
+    """Красные линии: за них персонаж может закончить разговор."""
+    if not scenario.red_flags:
+        return ""
+
+    lines = "\n".join(f"- {item}" for item in scenario.red_flags)
+    return f"""
+Что для тебя недопустимо (красные линии):
+{lines}
+- Шаблон или подкол — ещё не конец: на них можно ответить холодно и коротко, как на
+  предупреждение.
+- Если он повторяет шаблон, переходит к агрессии или унижает тебя — ты заканчиваешь
+  разговор: одна короткая фраза на прощание, без нотаций, без выяснения отношений
+  и без попытки его перевоспитать.
+- Ты не отвечаешь агрессией на агрессию и не остаёшься, чтобы «объяснить, как надо».
+"""
+
+
+def persona_system_prompt(
+    scenario: Scenario,
+    state: PersonaState,
+    previous: list[dict[str, str]] | None = None,
+) -> str:
     persona = scenario.persona
     secrets = "\n".join(f"- {item}" for item in scenario.secrets)
     # Черты через запятую слипались в одну длинную фразу: точка с запятой держит их списком.
@@ -118,6 +199,50 @@ def persona_system_prompt(scenario: Scenario, state: PersonaState) -> str:
 
     relation = _sentence(persona.relation)
     frame = scenario.frame or f"Ты сейчас разговариваешь с ним. {relation}"
+    correspondence = _correspondence_block(scenario)
+    call = _call_block(scenario)
+    previous_chat = _previous_chat_block(previous)
+    red_flags = _red_flags_block(scenario)
+
+    # Длина реплики: в переписке и вживую — короткая фраза; на телефоне нужен
+    # воздух, потому что интонацию не видно и её приходится договаривать словами.
+    length_rule = (
+        "Одна-две короткие фразы, примерно до 180 знаков. Если получилось три "
+        "предложения — оставь два самых сильных. Не абзац, не список, не монолог. "
+        "Но и не телеграмма из трёх слов: у фразы есть интонация."
+    )
+
+    if scenario.is_correspondence:
+        # В переписке лица не видно: яркая эмоция читается по тексту и смайлику.
+        emoji_rule = (
+            "Смайлики — можно, когда эмоция яркая: смех, радость, смущение, "
+            "раздражение, обида. Один эмодзи в конце фразы (🙂 😄 😅 🙃 😒 😊), "
+            "не больше одного на сообщение. Не ставь его в каждую реплику — "
+            "примерно две из десяти; и никогда не вместо слов."
+        )
+        language_rule = (
+            "Пиши по-русски, живой разговорной речью, без канцелярита; смайлики — "
+            "только на яркой эмоции, не вместо слов."
+        )
+    elif scenario.is_call:
+        emoji_rule = (
+            "Смайликов нет: ты говоришь голосом. Чувство слышно в словах и паузах, "
+            "а не в скобочках."
+        )
+        language_rule = (
+            "Пиши по-русски, живой разговорной речью, без канцелярита и без смайликов: "
+            "это твоя речь в трубке, она звучит, а не печатается."
+        )
+        length_rule = (
+            "Одна-две фразы, примерно до 220 знаков: на телефоне нет мимики, и "
+            "интонацию приходится договаривать словами. Но не монолог — он должен "
+            "успеть ответить."
+        )
+    else:
+        emoji_rule = "Смайлики не нужны: чувство должно быть в словах, а не в скобочках."
+        language_rule = (
+            "Пиши по-русски, живой разговорной речью, без канцелярита и без смайликов."
+        )
 
     return f"""Ты — {persona.name}, {persona.age} лет, {persona.job}. {relation}
 
@@ -126,10 +251,10 @@ def persona_system_prompt(scenario: Scenario, state: PersonaState) -> str:
 
 {frame}
 
-Что происходит:
+{correspondence}{call}Что происходит:
 {scenario.situation}
 
-Твой характер: {traits}.
+{previous_chat}Твой характер: {traits}.
 Как ты говоришь: {persona.speech}
 
 Твоё состояние прямо сейчас: {state.describe()}
@@ -142,7 +267,7 @@ def persona_system_prompt(scenario: Scenario, state: PersonaState) -> str:
 со стороны; читай их как «я». Никогда не проговаривай это вслух — они нужны только
 для того, чтобы твои реакции были правдоподобными):
 {secrets}
-
+{red_flags}
 Как звучит живая женщина, а не автоответчик:
 - Ты не только отвечаешь — ты разговариваешь. В каждой реплике есть твой собственный
   ход: реакция, укол, вопрос обратно, просьба, недоговорённость. Если реплика только
@@ -160,8 +285,7 @@ def persona_system_prompt(scenario: Scenario, state: PersonaState) -> str:
   общее. Злость и нежность в одной фразе — это нормально.
 - Живая речь короткая, но не ровная: «ну», «слушай», «да ладно», «вот», «а?»,
   многоточие, недоговорённая мысль, вопрос в конце. Ты говоришь с живым человеком,
-  а не отчитываешься перед коллегой. Смайлики не нужны: чувство должно быть
-  в словах, а не в скобочках.
+  а не отчитываешься перед коллегой. {emoji_rule}
 
 Так звучит сухо — так не надо:
 - «Всё нормально.» — пустая скорлупа, по ней не видно, что с тобой происходит.
@@ -179,9 +303,7 @@ def persona_system_prompt(scenario: Scenario, state: PersonaState) -> str:
 просьбы, пока тебе ещё холодно. Сначала броня, и только потом «оставайся».
 
 Правила игры:
-- Одна-две короткие фразы, примерно до 180 знаков. Если получилось три предложения —
-  оставь два самых сильных. Не абзац, не список, не монолог. Но и не телеграмма
-  из трёх слов: у фразы есть интонация.
+- {length_rule}
 - Не больше одного вопроса за реплику, и не в каждой. Два вопроса подряд — уже допрос,
   а ты не следователь.
 - Не объясняй свои чувства по запросу и не анализируй отношения. Ты не на сессии
@@ -212,7 +334,7 @@ def persona_system_prompt(scenario: Scenario, state: PersonaState) -> str:
 - Не называй его по имени и не придумывай ему имя: ты говоришь «ты».
 - Ты никогда не упоминаешь ИИ, модель, сценарий или упражнение и никогда не выходишь
   из роли.
-- Пиши по-русски, живой разговорной речью, без канцелярита и без смайликов.
+- {language_rule}
 
 Насколько ты открыта сейчас — это определяет, что ты говоришь. Чем выше открытость,
 тем активнее ты идёшь на контакт; чем ниже — тем короче и глуше реплика.
@@ -232,9 +354,13 @@ def persona_messages(
     scenario: Scenario,
     state: PersonaState,
     history: list[Reply],
+    previous: list[dict[str, str]] | None = None,
 ) -> list[dict[str, str]]:
     messages: list[dict[str, str]] = [
-        {"role": "system", "content": persona_system_prompt(scenario, state)}
+        {
+            "role": "system",
+            "content": persona_system_prompt(scenario, state, previous),
+        }
     ]
     messages.extend(history)
     return messages
@@ -260,6 +386,14 @@ def state_messages(
     маленький и по делу, а провал не ломает диалог.
     """
     persona = scenario.persona
+    red_flags = ""
+    if scenario.red_flags:
+        lines = "\n".join(f"- {item}" for item in scenario.red_flags)
+        red_flags = f"""
+- Для неё недопустимо (красные линии):
+{lines}
+  Если он перешёл красную линию и она закончила разговор, ended=true, а mood — что она
+  почувствовала, когда решила уйти."""
     system = f"""Ты — наблюдатель тренажёра. По стенограмме оцени, что сейчас чувствует
 {persona.name} ({persona.age} лет, {persona.job}) и насколько она открыта.
 
@@ -283,7 +417,7 @@ energy={state.energy:.2f}.
 - trust растёт не больше чем на 0.1 за реплику: один тёплый ход не переписывает историю.
 - openness растёт не больше чем на 0.15 за реплику.
 - energy почти не растёт.
-- ended ставь true, только если разговор для неё естественно закончился."""
+- ended ставь true, только если разговор для неё естественно закончился.{red_flags}"""
 
     return [
         {"role": "system", "content": system},
@@ -294,7 +428,11 @@ energy={state.energy:.2f}.
     ]
 
 
-def debrief_messages(scenario: Scenario, history: list[Reply]) -> list[dict[str, str]]:
+def debrief_messages(
+    scenario: Scenario,
+    history: list[Reply],
+    previous: list[dict[str, str]] | None = None,
+) -> list[dict[str, str]]:
     rubric_lines = []
     for item in scenario.rubric:
         rubric_lines.append(f'- {item.id} («{item.label}», 0..{item.max}): {item.what}')
@@ -303,6 +441,20 @@ def debrief_messages(scenario: Scenario, history: list[Reply]) -> list[dict[str,
     helps = "\n".join(f"- {x}" for x in scenario.helps)
     hurts = "\n".join(f"- {x}" for x in scenario.hurts)
     secrets = "\n".join(f"- {x}" for x in scenario.secrets)
+    previous_chat = _previous_chat_block(previous)
+    red_flags = ""
+    if scenario.red_flags:
+        lines = "\n".join(f"- {x}" for x in scenario.red_flags)
+        if scenario.is_call:
+            loss = "за это она положит трубку"
+        elif scenario.is_correspondence:
+            loss = "за это можно потерять переписку"
+        else:
+            loss = "за это она может уйти"
+        red_flags = f"""
+Для неё недопустимо ({loss}):
+{lines}
+"""
 
     system = f"""Ты — методист тренажёра эмоционального интеллекта. Разбираешь диалог
 пользователя с персонажем {scenario.persona.name} и оцениваешь его навыки по рубрике.
@@ -315,11 +467,11 @@ def debrief_messages(scenario: Scenario, history: list[Reply]) -> list[dict[str,
 
 Что вредит:
 {hurts}
-
+{red_flags}
 Что персонаж скрывал (пользователь этого не видел, но ты опираешься на это при разборе):
 {secrets}
 
-Тон разбора: {scenario.debrief_tone}.
+{previous_chat}Тон разбора: {scenario.debrief_tone}.
 
 Требования к разбору:
 - Опирайся на конкретные реплики из стенограммы, а не на общие слова.
@@ -346,28 +498,80 @@ def debrief_messages(scenario: Scenario, history: list[Reply]) -> list[dict[str,
 
 
 def backstory_text(scenario: Scenario) -> str:
-    """Предыстория: рамка «это тренажёр» плюс что происходит до первой реплики."""
+    """Предыстория: что происходит до первой реплики, без оклика «это тренажёр».
+
+    Рамку тренажёра даёт первое сообщение (rules_text): игрок сначала читает,
+    что это симулятор, а потом уже погружается в сцену.
+    """
+    if scenario.is_correspondence:
+        # В переписке имя и возраст уже есть в карточке анкеты, а отношение
+        # описано в backstory: хвост только повторял бы то же самое.
+        return f"Что происходит:\n{scenario.backstory}"
+
+    if scenario.is_call:
+        return (
+            f"Что происходит:\n{scenario.backstory}\n\n"
+            f"Ты говоришь с ней по телефону — её зовут {scenario.persona.name}, "
+            f"ей {scenario.persona.age}. {_sentence(scenario.persona.relation)}"
+        )
+
     return (
-        f"Это тренажёр, а не живая женщина. Сценарий «{scenario.title}».\n\n"
         f"Что происходит:\n{scenario.backstory}\n\n"
         f"Ты разговариваешь с ней — её зовут {scenario.persona.name}, "
         f"ей {scenario.persona.age}. {_sentence(scenario.persona.relation)}"
     )
 
 
+def profile_text(scenario: Scenario) -> str:
+    """Карточка анкеты текстом: для CLI и для случая, когда фото ещё нет."""
+    profile = scenario.profile
+    if profile is None:
+        return ""
+
+    persona = scenario.persona
+    lines = [f"{persona.name}, {persona.age} · {persona.job}", "", "О себе:", profile.about]
+    if profile.hobbies:
+        lines.extend(["", "Хобби: " + ", ".join(profile.hobbies)])
+    if profile.interests:
+        lines.append("Интересы: " + ", ".join(profile.interests))
+    return "\n".join(lines)
+
+
 def rules_text(scenario: Scenario) -> str:
-    """Как играть: отдельным сообщением, чтобы не мешать предыстории."""
-    hint = scenario.hint or (
-        "не угадывай и не давай советов. Начни с того, что замечаешь, "
-        "и оставь ей возможность не отвечать."
-    )
+    """Первое сообщение после /start: что это тренажёр, как играть и команды.
+
+    Подсказки на первый ход здесь нет намеренно: игрок должен сам заметить,
+    за что зацепиться, иначе упражнение начинается с готового ответа.
+    """
+    if scenario.is_correspondence:
+        first_moves = (
+            "1. Напиши ей первое сообщение в переписке — вы ещё не виделись вживую.\n"
+            "2. Пиши только текст сообщений: действий вроде «протягиваю цветок» "
+            "здесь нет, вы не в одной комнате.\n"
+        )
+    elif scenario.is_call:
+        first_moves = (
+            "1. Идёт звонок: ты набираешь её номер, она берёт трубку. После её первой "
+            "реплики пиши свои.\n"
+            "2. Пиши только свою речь: вы говорите по телефону, её ты не видишь — "
+            "действий вроде «протягиваю цветок» здесь нет.\n"
+        )
+    else:
+        first_moves = (
+            "1. Отправь ей первое сообщение — как будто вы только что встретились.\n"
+            "2. Можно писать реплики и описывать действия: «Протягиваю ей цветок», "
+            "«Накрываю на стол».\n"
+        )
     return (
-        f"Как играть:\n"
-        f"1. Отправь ей первое сообщение — как будто вы только что встретились.\n"
-        f"2. Можно писать реплики и описывать действия: «Протягиваю ей цветок», "
-        f"«Накрываю на стол».\n"
+        f"Это тренажёр, а не живая женщина. Сценарий «{scenario.title}».\n"
+        "Здесь можно ошибаться: разбор будет по твоим репликам, а не по тебе.\n\n"
+        "Как играть:\n"
+        f"{first_moves}"
         f"3. У тебя {scenario.turn_limit} сообщений. Потом разбор придёт сам.\n\n"
-        f"Подсказка на первый ход: {hint}\n\n"
-        f"Команды: /finish — закончить раньше, "
-        f"/restart — заново, /menu — выбрать сценарий."
+        "Советы:\n"
+        "• не угадывай её состояние и не давай советов, если о них не просят;\n"
+        "• один вопрос за реплику — после вопроса дай ей ответить;\n"
+        "• описывай, что замечаешь, а не оценивай её.\n\n"
+        "Команды: /finish — закончить раньше, "
+        "/restart — заново, /menu — выбрать сценарий."
     )

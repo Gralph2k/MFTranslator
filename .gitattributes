@@ -1,0 +1,8 @@
+# Деплой идёт с рабочей машины на Linux: скрипты и юниты должны остаться LF,
+# иначе на сервере bash/systemd споткнутся о CRLF.
+*.sh text eol=lf
+*.cron text eol=lf
+*.service text eol=lf
+*.py text eol=lf
+*.json text eol=lf
+*.md text eol=lf

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import random
 from pathlib import Path
 from typing import Any
 
@@ -12,24 +11,31 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.exceptions import TelegramNetworkError, TelegramUnauthorizedError
 from aiogram.filters import Command, CommandStart
-from aiogram.types import CallbackQuery, FSInputFile, Message
+from aiogram.types import CallbackQuery, FSInputFile, InputMediaPhoto, Message
 
 from .config import Settings, load_settings
 from .engine import DialogueEngine, DialogueSession
 from .faces import emotion_for_state, face_path
 from .launcher import clear_pid, write_pid
 from .llm import DeepSeekLLM, LLM
-from .menus import after_finish_menu, scenario_pick, scenario_title, scenarios_menu
-from .prompts import backstory_text, rules_text
+from .menus import (
+    after_finish_menu,
+    scenario_title,
+    scenarios_menu,
+)
+from .profile_card import render_profile_cards
+from .prompts import backstory_text, profile_text, rules_text
 from .safety import CrisisDetected, safety_message
 from .scenario import Scenario, ScenarioError, available_scenarios, load_scenario
 from .state import PersonaState
-from .storage import Storage
+from .storage import Storage, StoredSession
 
 log = logging.getLogger(__name__)
 router = Router()
 
 MAX_MESSAGE = 4000
+# Сколько последних сообщений прошлой переписки персонаж помнит в продолжении.
+PREVIOUS_MESSAGES = 12
 
 
 class Trainer:
@@ -70,13 +76,16 @@ class Trainer:
         if stored is None:
             return None
 
+        scenario = self.scenario_by_id(stored.scenario)
         session = DialogueSession(
-            scenario=self.scenario_by_id(stored.scenario),
+            scenario=scenario,
             state=PersonaState.from_mapping(stored.state),
             history=stored.history,
             user_turns=stored.user_turns,
+            ended_by_persona=stored.ended_by_persona,
             finished=stored.finished,
             session_id=stored.id,
+            previous=self._previous_chat(user_id, scenario),
         )
         self.sessions[telegram_id] = session
         return session
@@ -86,16 +95,43 @@ class Trainer:
         old = self.storage.get_active_session(user_id)
         if old is not None:
             self.storage.save_session(
-                old.id, old.state, old.history, old.user_turns, finished=True
+                old.id,
+                old.state,
+                old.history,
+                old.user_turns,
+                finished=True,
+                ended_by_persona=old.ended_by_persona,
             )
 
         scenario = self.default_scenario if scenario_id is None else self.scenario_by_id(scenario_id)
-        session = self.engine.start(scenario)
+        session = self.engine.start(scenario, self._previous_chat(user_id, scenario))
         session.session_id = self.storage.create_session(
             user_id, scenario.id, session.state.to_mapping(), session.history
         )
         self.sessions[telegram_id] = session
         return session
+
+    def _previous_chat(self, user_id: int, scenario: Scenario) -> list[dict[str, str]]:
+        """Переписка из сценария-продолжения: последняя удачная попытка или канон.
+
+        Реальную переписку берём, только если она доиграна и персонаж не сбежал:
+        после красной линии звонок идёт по канону, без отсылок к тому разговору.
+        """
+        if not scenario.continues:
+            return list(scenario.canon_history)
+
+        stored = self.storage.last_session_for(user_id, scenario.continues)
+        if stored is None or not self._is_completed_chat(stored):
+            return list(scenario.canon_history)
+
+        return stored.history[-PREVIOUS_MESSAGES:]
+
+    def _is_completed_chat(self, stored: StoredSession) -> bool:
+        """Доигранная переписка: есть ходы, есть разбор и она не оборвалась."""
+        if stored.ended_by_persona or stored.user_turns == 0 or not stored.history:
+            return False
+        overview = self.storage.get_overview(stored.id)
+        return overview is not None and bool(overview.debrief)
 
     def persist(self, telegram_id: int, session: DialogueSession) -> None:
         if session.session_id is None:
@@ -106,6 +142,7 @@ class Trainer:
             session.history,
             session.user_turns,
             session.finished,
+            ended_by_persona=session.ended_by_persona,
         )
 
 
@@ -133,8 +170,12 @@ async def _send_long(message: Message, text: str) -> None:
 
 
 async def _send_face(message: Message, trainer: "Trainer", session: Any, caption: str) -> bool:
-    """Лицо под текущее настроение. False — если картинки нет, текст отправит вызывающий."""
-    if not trainer.with_faces:
+    """Лицо под текущее настроение. False — если картинки нет, текст отправит вызывающий.
+
+    В переписке и на созвоне лицо не показываем: там эмоция читается только
+    по тексту и смайликам, иначе рушится сама сцена.
+    """
+    if not trainer.with_faces or not session.scenario.shows_face:
         return False
 
     emotion = emotion_for_state(session.state)
@@ -155,17 +196,72 @@ async def _send_face(message: Message, trainer: "Trainer", session: Any, caption
     return True
 
 
+async def _send_call_screen(target: Message, scenario: Scenario) -> None:
+    """Экран исходящего звонка: единственная картинка сцены-созвона.
+
+    Рисуется кодом поверх фото (имя, «мобильный», «Вызов…», кнопка сброса):
+    текст на сгенерированных картинках превращается в кашу, поэтому UI — PIL.
+    """
+    from .call_screen import render_call_screen
+
+    path = render_call_screen(scenario)
+    if path is None:
+        return
+    await target.answer_photo(FSInputFile(path))
+
+
+async def _send_profile(
+    target: Message,
+    trainer: "Trainer",
+    scenario: Scenario,
+) -> None:
+    """Карточка анкеты как в приложении: UI рисуется кодом поверх фото.
+
+    Подписи у фото разные: работа и «о себе», интересы, чего ищет. Так текст
+    не повторяется отдельным блоком «О себе». Фото анкеты лежат в папке
+    сценария с именами `profile_*` — `faces.py` их не трогает.
+    """
+    profile = scenario.profile
+    if profile is None:
+        return
+
+    photos = [
+        (scenario.faces_dir / name, name)
+        for name in profile.photos
+        if (scenario.faces_dir / name).is_file()
+    ]
+    cards = render_profile_cards(scenario) if trainer.with_faces else []
+    captions = profile.captions
+
+    def photo_caption(index: int) -> str | None:
+        if index >= len(photos):
+            return None
+        return captions.get(photos[index][1]) or None
+
+    if len(cards) == 1:
+        # Одно фото — не альбом: answer_media_group требует хотя бы два кадра.
+        await target.answer_photo(
+            FSInputFile(cards[0]), caption=photo_caption(0)
+        )
+    elif cards:
+        media = [
+            InputMediaPhoto(
+                media=FSInputFile(card),
+                caption=photo_caption(index),
+            )
+            for index, card in enumerate(cards)
+        ]
+        await target.answer_media_group(media)
+    else:
+        await _send_long(target, profile_text(scenario))
+
+
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     trainer = _trainer(message)
-    # Старт без выбора: сценарий берётся случайно, чтобы не приедался один и тот же.
-    await _begin(
-        message,
-        trainer,
-        message.from_user.id,
-        random.choice(available_scenarios()),
-        random_pick=True,
-    )
+    # /start всегда открывает первый сценарий: обучение идёт по порядку,
+    # а другой можно выбрать кнопкой или командой /scenario.
+    await _begin(message, trainer, message.from_user.id, available_scenarios()[0])
 
 
 async def _begin(
@@ -173,9 +269,8 @@ async def _begin(
     trainer: "Trainer",
     telegram_id: int,
     scenario_id: str | None = None,
-    random_pick: bool = False,
 ) -> None:
-    """Начинает сценарий и присылает вступление с первой репликой."""
+    """Начинает сценарий: сначала правила, потом описание и картинки."""
     try:
         session = trainer.start_session(telegram_id, scenario_id)
     except ScenarioError:
@@ -183,18 +278,27 @@ async def _begin(
         return
 
     trainer.persist(telegram_id, session)
+    # 1. «Это тренажёр», как играть и команды — без подсказки на первый ход.
     await _send_long(target, rules_text(session.scenario))
-    await _send_long(target, backstory_text(session.scenario))
-    opening = f"{session.scenario.persona.name}: {session.scenario.opening}"
-    if not await _send_face(target, trainer, session, opening):
-        await target.answer(opening)
 
-    if random_pick:
-        await target.answer(
-            f"Сценарий выбран случайно: «{session.scenario.title}». "
-            f"Другой можно выбрать здесь:",
-            reply_markup=scenario_pick(),
-        )
+    if session.scenario.is_correspondence:
+        # 2. Описание сценария, 3. её анкета — подписи с «о себе» разнесены по фото.
+        await _send_long(target, backstory_text(session.scenario))
+        # 3. Анкета с картинками и подписями. «Ход твой» уже сказан в описании,
+        #    поэтому отдельного сообщения с подсказкой нет.
+        await _send_profile(target, trainer, session.scenario)
+    elif session.scenario.is_call:
+        # 2. Описание сцены, 3. экран исходящего звонка, 4. её «алло».
+        await _send_long(target, backstory_text(session.scenario))
+        await _send_call_screen(target, session.scenario)
+        if session.scenario.opening.strip():
+            await target.answer(session.scenario.opening)
+    else:
+        # 2. Описание сцены, 3. первая реплика персонажа приходит с её лицом.
+        await _send_long(target, backstory_text(session.scenario))
+        opening = session.scenario.opening
+        if not await _send_face(target, trainer, session, opening):
+            await target.answer(opening)
 
 
 @router.message(Command("menu"))
@@ -218,11 +322,11 @@ async def cmd_scenario(message: Message) -> None:
 async def cmd_restart(message: Message) -> None:
     trainer = _trainer(message)
     current = trainer.get_session(message.from_user.id)
-    # Без активной сессии повтор — это новый старт, а не возврат к умолчанию.
+    # Без активной сессии повтор — это новый старт с первого сценария.
     scenario_id = (
         current.scenario.id
         if current is not None
-        else random.choice(available_scenarios())
+        else available_scenarios()[0]
     )
     await _begin(message, trainer, message.from_user.id, scenario_id)
 
@@ -299,13 +403,24 @@ async def on_text(message: Message) -> None:
         return
 
     trainer.persist(message.from_user.id, session)
-    reply_text = f"{session.scenario.persona.name}: {reply}"
+    # Имя перед репликой не пишем: в переписке сообщение и так от неё.
+    reply_text = reply
     if len(reply_text) > 1024:
         # Не влезает в подпись к фото — шлём картинку и текст отдельно.
         await _send_face(message, trainer, session, "")
         await _send_long(message, reply_text)
     elif not await _send_face(message, trainer, session, reply_text):
         await _send_long(message, reply_text)
+
+    if session.ended_by_persona:
+        # Красная линия: она закончила разговор. Разбор объяснит, на каком ходу.
+        if session.scenario.is_call:
+            farewell = "Она положила трубку. Сейчас будет разбор — почему."
+        elif session.scenario.is_correspondence:
+            farewell = "Она закрыла переписку. Сейчас будет разбор — почему."
+        else:
+            farewell = "Она ушла от разговора. Сейчас будет разбор — почему."
+        await message.answer(farewell)
 
     if session.is_over:
         # Сюжет закончился (кончились ходы или персонаж закрыл тему) — разбираем сразу.

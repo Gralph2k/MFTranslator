@@ -13,7 +13,7 @@ from typing import Any
 from .config import Settings, load_settings
 from .engine import DialogueEngine
 from .llm import DeepSeekLLM, LLM
-from .prompts import backstory_text, rules_text
+from .prompts import backstory_text, profile_text, rules_text
 from .safety import CrisisDetected, safety_message
 from .scenario import load_scenario
 
@@ -67,7 +67,7 @@ class DemoLLM:
         return None
 
 
-def build_llm(provider: str, settings: Settings) -> LLM:
+def build_llm(provider: str, settings: Settings, medium: str = "in_person") -> LLM:
     if provider == "deepseek":
         if not settings.has_llm:
             raise SystemExit(
@@ -79,11 +79,27 @@ def build_llm(provider: str, settings: Settings) -> LLM:
             base_url=settings.deepseek_base_url,
             model=settings.deepseek_model,
         )
-    return DemoLLM(_demo_replies(), _demo_debrief())
+    return DemoLLM(_demo_replies(medium), _demo_debrief())
 
 
-def _demo_replies() -> list[str]:
+def _demo_replies(medium: str = "in_person") -> list[str]:
     """Заготовки реплик персонажа: показывают рост открытости."""
+    if medium == "chat":
+        # Переписка в приложении: та же Вера, но пока только текстом.
+        # Смайлики — только на яркой эмоции, не в каждой реплике.
+        return [
+            "Ну привет 🙂 Ты первый сегодня, кто спросил не «как дела».",
+            "Сальса — это не «научиться», это «перестать думать». Ладно, расскажу.",
+            "Слушай, давай в четверг после девяти? Только чур без «покажи, что умеешь» 😄",
+        ]
+    if medium == "call":
+        # Созвон: та же Вера голосом — телефонная фактура и тепло под иронией,
+        # а не телеграфные «да», «нет», «хорошо».
+        return [
+            "Алло. О. Ты правда позвонил. Я уже думала, ты из тех, кто пишет «наберу».",
+            "Погоди, без «я не такой, как все», ага? Скажи нормально: что предлагаешь?",
+            "Суббота... ну, суббота у меня как раз свободна. Только не бар, ладно?",
+        ]
     return [
         "Нормально всё. Правда. Ну... почти правда.",
         "Не хочу сейчас об этом. Даже не из-за тебя, просто... не хочу.",
@@ -127,18 +143,47 @@ def _demo_debrief(rubric_ids: list[str] | None = None) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
+def _print_profile(scenario) -> None:
+    """В терминале карточка текстом: те же подписи, что уйдут с фото."""
+    profile = scenario.profile
+    if profile is None:
+        return
+
+    print(f"  {scenario.persona.name}, {scenario.persona.age}")
+    if profile.captions:
+        for number, name in enumerate(profile.photos, start=1):
+            caption = profile.captions.get(name)
+            if caption:
+                print(f"  Фото {number}: {caption}")
+    else:
+        print(profile_text(scenario))
+
+
 async def run(provider: str, scenario_name: str) -> int:
     settings = load_settings()
     scenario = load_scenario(scenario_name)
-    llm = build_llm(provider, settings)
+    llm = build_llm(provider, settings, scenario.medium)
     engine = DialogueEngine(llm)
-    session = engine.start(scenario)
+    # В созвоне персонаж опирается на канонную переписку: в CLI у игрока нет
+    # сохранённой прошлой попытки, как в боте, поэтому берём канон.
+    previous = scenario.canon_history if scenario.is_call else None
+    session = engine.start(scenario, previous)
 
     print(f"=== {scenario.title} ===")
     print(rules_text(scenario))
     print()
     print(backstory_text(scenario))
-    print(f"\n{scenario.persona.name}: {scenario.opening}\n")
+    if scenario.is_call:
+        print()
+        print("[экран звонка: исходящий вызов — Вера, мобильный]")
+    if scenario.is_correspondence:
+        print()
+        print("Анкета в приложении знакомств:")
+        _print_profile(scenario)
+    if scenario.opening.strip():
+        print(f"\n{scenario.opening}\n")
+    else:
+        print()
 
     interactive = sys.stdin.isatty()
     try:
@@ -172,7 +217,7 @@ async def run(provider: str, scenario_name: str) -> int:
                 print(f"[ошибка модели: {exc}]")
                 continue
 
-            print(f"{scenario.persona.name}: {reply}")
+            print(reply)
             print(f"[состояние: {session.state.to_mapping()} | осталось ходов: {session.turns_left}]\n")
     finally:
         await llm.aclose()

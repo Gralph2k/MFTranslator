@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     history_json TEXT NOT NULL,
     user_turns INTEGER NOT NULL DEFAULT 0,
     finished INTEGER NOT NULL DEFAULT 0,
+    ended_by_persona INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT
 );
@@ -59,6 +60,9 @@ class StoredSession:
     finished: bool
     created_at: str
     updated_at: str | None
+    # Персонаж сам закончил разговор (красная линия): продолжение после такого
+    # разговора идёт по канону, а не по реальной переписке.
+    ended_by_persona: bool = False
 
 
 @dataclass
@@ -95,19 +99,24 @@ class Storage:
         columns = {
             row["name"] for row in self._conn.execute("PRAGMA table_info(sessions)")
         }
-        if "updated_at" in columns:
-            return
-        self._conn.execute("ALTER TABLE sessions ADD COLUMN updated_at TEXT")
-        # Для старых строк время последнего хода не сохранялось: берём разбор,
-        # а если его нет — момент начала, чтобы список не падал на NULL.
-        self._conn.execute(
-            """UPDATE sessions
-               SET updated_at = COALESCE(
-                   (SELECT MAX(created_at) FROM debriefs
-                    WHERE debriefs.session_id = sessions.id),
-                   created_at)
-               WHERE updated_at IS NULL"""
-        )
+        if "updated_at" not in columns:
+            self._conn.execute("ALTER TABLE sessions ADD COLUMN updated_at TEXT")
+            # Для старых строк время последнего хода не сохранялось: берём разбор,
+            # а если его нет — момент начала, чтобы список не падал на NULL.
+            self._conn.execute(
+                """UPDATE sessions
+                   SET updated_at = COALESCE(
+                       (SELECT MAX(created_at) FROM debriefs
+                        WHERE debriefs.session_id = sessions.id),
+                       created_at)
+                   WHERE updated_at IS NULL"""
+            )
+        if "ended_by_persona" not in columns:
+            # Старые сессии не писали, кто закончил разговор: считаем, что игрок.
+            self._conn.execute(
+                "ALTER TABLE sessions ADD COLUMN ended_by_persona "
+                "INTEGER NOT NULL DEFAULT 0"
+            )
 
     def close(self) -> None:
         with self._lock:
@@ -154,16 +163,17 @@ class Storage:
         history: list[dict[str, str]],
         user_turns: int,
         finished: bool,
+        ended_by_persona: bool = False,
     ) -> None:
         with self._lock:
             self._conn.execute(
                 """UPDATE sessions
                    SET state_json = ?, history_json = ?, user_turns = ?, finished = ?,
-                       updated_at = ?
+                       ended_by_persona = ?, updated_at = ?
                    WHERE id = ?""",
                 (json.dumps(state, ensure_ascii=False),
                  json.dumps(history, ensure_ascii=False),
-                 user_turns, int(finished), _now(), session_id),
+                 user_turns, int(finished), int(ended_by_persona), _now(), session_id),
             )
             self._conn.commit()
 
@@ -181,6 +191,17 @@ class Storage:
         with self._lock:
             row = self._conn.execute(
                 "SELECT * FROM sessions WHERE id = ?", (session_id,)
+            ).fetchone()
+        return _row_to_session(row) if row is not None else None
+
+    def last_session_for(self, user_id: int, scenario_id: str) -> StoredSession | None:
+        """Последняя попытка пройти конкретный сценарий — для сценариев-продолжений."""
+        with self._lock:
+            row = self._conn.execute(
+                """SELECT * FROM sessions
+                   WHERE user_id = ? AND scenario_id = ?
+                   ORDER BY id DESC LIMIT 1""",
+                (user_id, scenario_id),
             ).fetchone()
         return _row_to_session(row) if row is not None else None
 
@@ -257,6 +278,7 @@ def _row_to_session(row: sqlite3.Row) -> StoredSession:
         finished=bool(row["finished"]),
         created_at=str(row["created_at"]),
         updated_at=row["updated_at"],
+        ended_by_persona=bool(row["ended_by_persona"]),
     )
 
 
