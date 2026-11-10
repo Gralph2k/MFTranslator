@@ -1,0 +1,13 @@
+{
+  "scenario": "first_message",
+  "persona": "average",
+  "mode": "живой человек (без рамки тренажёра и советов)",
+  "heroine_model": "deepseek-chat",
+  "player_model": "deepseek-chat",
+  "player_temperature": 1.1,
+  "turn_limit": 12,
+  "turns_played": 9,
+  "ended_by": "heroine",
+  "started_at": "2026-11-09T20:16:30.716802+00:00",
+  "finished_at": "2026-11-09T20:17:14.586813+00:00"
+}

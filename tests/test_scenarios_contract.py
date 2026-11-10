@@ -1,12 +1,15 @@
-"""Контракт сценария: каждый файл в scenarios/ должен ему соответствовать."""
+"""Контракт сценария и героини: каждый файл в scenarios/ и heroines/ должен ему соответствовать."""
+
+import json
 
 import pytest
 
 from bot.faces import EMOTIONS
-from bot.scenario import available_scenarios, load_scenario
+from bot.heroines import load_heroine
+from bot.scenario import all_scenarios, load_scenario
 
 
-@pytest.mark.parametrize("name", available_scenarios())
+@pytest.mark.parametrize("name", all_scenarios())
 def test_scenario_meets_contract(name):
     scenario = load_scenario(name)
 
@@ -31,7 +34,7 @@ def test_scenario_meets_contract(name):
     # Рамка и шаг к нему берутся из сценария: без них промпт описывает пару,
     # которая живёт вместе, и врёт про первое свидание.
     assert scenario.frame, "нужна рамка разговора"
-    assert scenario.contact_hint, "нужно, что значит шаг к нему в этой сцене"
+    assert scenario.contact_hint, "нужно, что значит шаг к ней в этой сцене"
     # Сценарий — папка: рядом со scenario.json лежит images/ с фотографиями.
     assert scenario.dir.is_dir(), "нет папки сценария"
     assert scenario.faces_dir.is_dir(), "нет папки для фотографий"
@@ -41,7 +44,23 @@ def test_scenario_meets_contract(name):
         assert "—" in hurt and len(hurt) > 60, f"ловушка без объяснения: {hurt}"
 
     # Среди рабочих ходов должна быть граница — просьба о ясности или отказ.
-    assert any(("скажи" in help_.lower() or "границ" in help_.lower()) for help_ in scenario.helps)
+    assert any(
+        ("скажи" in help_.lower() or "границ" in help_.lower())
+        for help_ in scenario.helps
+    )
+
+    if scenario.demo_replies:
+        assert all(reply.strip() for reply in scenario.demo_replies)
+
+    # Личность живёт в heroines/, сценарий хранит только сцену.
+    raw = json.loads((scenario.dir / "scenario.json").read_text(encoding="utf-8"))
+    if scenario.enabled:
+        assert scenario.heroine, "у включённого сценария должна быть героиня"
+        assert "persona" not in raw, "личность героини живёт в heroines/<slug>/heroine.json"
+        assert "profile" not in raw, "анкета героини живёт в heroines/<slug>/heroine.json"
+        assert raw.get("relation"), "сцене нужна связь героев (relation)"
+    else:
+        assert not scenario.heroine, "выключенный старый сценарий живёт без героини"
 
     # Сценарий-продолжение: у него есть эталонная переписка и живой предшественник.
     if scenario.continues:
@@ -58,7 +77,7 @@ def test_scenario_meets_contract(name):
         assert (scenario.faces_dir / "call.jpg").is_file(), "нет фото для экрана звонка"
 
 
-@pytest.mark.parametrize("name", available_scenarios())
+@pytest.mark.parametrize("name", all_scenarios())
 def test_profile_scenarios_meet_contract(name):
     """Анкета — признак переписки: игрок начинает первым, фото не путаются с эмоциями."""
     scenario = load_scenario(name)
@@ -83,3 +102,23 @@ def test_profile_scenarios_meet_contract(name):
 
     # Подписи — только к существующим фото; их можно не задавать.
     assert set(scenario.profile.captions) <= set(scenario.profile.photos)
+
+
+def test_heroine_files_are_complete():
+    """У каждой героини из ротации есть валидная личность и анкета."""
+    slugs = {
+        load_scenario(name).heroine
+        for name in all_scenarios()
+        if load_scenario(name).enabled
+    }
+    assert slugs == {"vera", "eva"}
+
+    for slug in slugs:
+        heroine = load_heroine(slug)
+        assert heroine.name and heroine.job
+        assert heroine.age > 0
+        assert heroine.traits
+        assert len(heroine.speech) >= 80
+        assert "«" in heroine.speech
+        assert heroine.profile is not None, "у героини в ротации должна быть анкета"
+        assert len(heroine.profile.photos) >= 3

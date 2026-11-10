@@ -1,0 +1,1 @@
+[разбор не получился: DeepSeek не ответил за 3 попыток: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1028)]

@@ -20,6 +20,13 @@ SIZE = 1024
 MARGIN = 36
 RADIUS = 44
 
+# Вёрстка меняется кодом, а кеш — по исходным фото. Без этого штампа новая
+# вёрстка не доехала бы до уже отрисованных карточек.
+CODE_STAMP = Path(__file__).stat().st_mtime
+
+# Подпись не должна залезать под кнопки: ширина карточки минус поля.
+TEXT_WIDTH = SIZE - 2 * (MARGIN + 40)
+
 _FONT_BOLD = Path("C:/Windows/Fonts/arialbd.ttf")
 _FONT_REGULAR = Path("C:/Windows/Fonts/arial.ttf")
 _FALLBACKS = (
@@ -39,6 +46,21 @@ def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.I
     return ImageFont.load_default()
 
 
+def card_caption(scenario: Scenario, photo_name: str) -> str:
+    """Текст на карточке: подпись конкретного фото, иначе — профессия.
+
+    Раньше на всех карточках стояла только профессия. Теперь подпись своя у
+    каждого кадра: работа и «о себе», хобби и интересы, чего она ищет, — и на
+    скриншоте анкеты видна вся её жизнь, а не только место работы.
+    """
+    profile = scenario.profile
+    if profile is not None:
+        caption = profile.captions.get(photo_name, "").strip()
+        if caption:
+            return caption
+    return scenario.persona.job
+
+
 def render_profile_cards(scenario: Scenario) -> list[Path]:
     """Собирает карточки анкеты из фото сценария. Пусто — если фото нет."""
     profile = scenario.profile
@@ -56,13 +78,28 @@ def render_profile_cards(scenario: Scenario) -> list[Path]:
     card_dir = CARD_DIR / scenario.id
     card_dir.mkdir(parents=True, exist_ok=True)
 
+    # Имя и подписи живут в scenario.json: их правка тоже должна сбрасывать кеш.
+    data_stamp = 0.0
+    data_file = scenario.dir / "scenario.json"
+    if data_file.is_file():
+        data_stamp = data_file.stat().st_mtime
+
     cards: list[Path] = []
     total = len(sources)
     for index, (source, name) in enumerate(sources):
         target = card_dir / f"{Path(name).stem}.jpg"
-        # Перерисовываем только если фото новее готовой карточки.
-        if not target.is_file() or target.stat().st_mtime < source.stat().st_mtime:
-            _render_card(source, target, index, total, scenario)
+        # Перерисовываем, если фото, код карточки или данные сценария новее файла.
+        if not target.is_file() or target.stat().st_mtime < max(
+            source.stat().st_mtime, CODE_STAMP, data_stamp
+        ):
+            _render_card(
+                source,
+                target,
+                index,
+                total,
+                scenario,
+                card_caption(scenario, name),
+            )
         cards.append(target)
     return cards
 
@@ -73,6 +110,7 @@ def _render_card(
     index: int,
     total: int,
     scenario: Scenario,
+    caption: str,
 ) -> None:
     base = Image.open(source).convert("RGB")
     side = min(base.size)
@@ -90,10 +128,10 @@ def _render_card(
     )
     canvas.paste(photo, (MARGIN, MARGIN), mask)
 
-    # Затемнение снизу: на нём читаются имя, профессия и кнопки.
+    # Затемнение снизу: на нём читаются имя, подпись и кнопки.
     overlay = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     shade = ImageDraw.Draw(overlay)
-    shade_top = SIZE - 430
+    shade_top = SIZE - 520
     for y in range(shade_top, SIZE):
         ratio = (y - shade_top) / max(1, SIZE - shade_top)
         alpha = int(215 * (ratio ** 1.35))
@@ -103,10 +141,10 @@ def _render_card(
     canvas = Image.alpha_composite(canvas.convert("RGBA"), overlay).convert("RGB")
 
     draw = ImageDraw.Draw(canvas)
-    label_font = _font(26, bold=True)
-    counter_font = _font(28)
-    name_font = _font(64, bold=True)
-    job_font = _font(30)
+    label_font = _font(30, bold=True)
+    counter_font = _font(32)
+    name_font = _font(68, bold=True)
+    caption_font = _font(36)
 
     # Шапка карточки.
     draw.text((MARGIN + 30, MARGIN + 24), "АНКЕТА", font=label_font, fill=(245, 245, 250))
@@ -119,19 +157,28 @@ def _render_card(
         fill=(240, 240, 245),
     )
 
-    # Подпись снизу.
+    # Имя и подпись к этому кадру — у самого нижнего края, над кнопками.
+    # Позиция считается от низа: подпись прижимается, имя встаёт над ней, поэтому
+    # даже длинная подпись не заезжает на кнопки приложения.
+    caption_lines = _wrap_lines(draw, caption, caption_font)
+    caption_step = _line_height(caption_font) + 8
+    caption_top = (
+        SIZE - 176 - caption_step * (len(caption_lines) - 1) - _line_height(caption_font)
+    )
+    name_top = caption_top - 14 - _line_height(name_font)
     draw.text(
-        (MARGIN + 40, SIZE - 256),
+        (MARGIN + 40, name_top),
         f"{scenario.persona.name}, {scenario.persona.age}",
         font=name_font,
         fill=(255, 255, 255),
     )
-    draw.text(
-        (MARGIN + 42, SIZE - 170),
-        scenario.persona.job,
-        font=job_font,
-        fill=(228, 228, 236),
-    )
+    for line_index, text_line in enumerate(caption_lines):
+        draw.text(
+            (MARGIN + 42, caption_top + line_index * caption_step),
+            text_line,
+            font=caption_font,
+            fill=(228, 228, 236),
+        )
 
     # Точки-индикатор, как под карточкой в приложении.
     dot_y = SIZE - 96
@@ -151,6 +198,31 @@ def _render_card(
     _heart_button(draw, SIZE - MARGIN - 92, SIZE - 112, 40)
 
     canvas.save(target, format="JPEG", quality=90, optimize=True)
+
+
+def _wrap_lines(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    width: int = TEXT_WIDTH,
+) -> list[str]:
+    """Разбивает подпись по словам: в кадр влезает одна–три строки."""
+    lines: list[str] = []
+    line = ""
+    for word in text.split():
+        candidate = f"{line} {word}".strip()
+        if line and draw.textlength(candidate, font=font) > width:
+            lines.append(line)
+            line = word
+        else:
+            line = candidate
+    if line:
+        lines.append(line)
+    return lines or [""]
+
+
+def _line_height(font: ImageFont.FreeTypeFont | ImageFont.ImageFont) -> int:
+    return int(getattr(font, "size", 24))
 
 
 def _cross_button(draw: ImageDraw.ImageDraw, cx: int, cy: int, radius: int) -> None:

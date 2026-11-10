@@ -240,7 +240,7 @@ sudo journalctl -u emotion-trainer -n 50 --no-pager
 ssh root@138.124.229.233 "bash /opt/mf-translator/deploy/backup.sh"
 
 # 2. архив только из нужных путей: .env, data, .git, .venv в него не попадают
-tar -czf .tmp\update.tgz AGENTS.md README.md PROGRESS.md pyproject.toml .env.example .gitignore run-bot.cmd run-cli.cmd sessions.cmd bot deploy scenarios prompts tests
+tar -czf .tmp\update.tgz AGENTS.md README.md PROGRESS.md pyproject.toml .env.example .gitignore run-bot.cmd run-cli.cmd sessions.cmd bot deploy heroines scenarios prompts tests
 scp .tmp\update.tgz root@138.124.229.233:/opt/update.tgz
 ```
 

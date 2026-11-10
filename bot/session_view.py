@@ -11,6 +11,7 @@ import re
 import sys
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from .config import load_settings
 from .scenario import Scenario, ScenarioError, load_scenario
@@ -223,14 +224,20 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         help="номер сессии; без него — последние 20 и ожидание номера",
     )
+    parser.add_argument(
+        "--db",
+        type=Path,
+        help="база для просмотра (по умолчанию DB_PATH из .env)",
+    )
     args = parser.parse_args(argv)
 
     settings = load_settings()
-    if not settings.db_path.exists():
-        print(f"База не найдена: {settings.db_path}")
+    db_path = args.db if args.db is not None else settings.db_path
+    if not db_path.exists():
+        print(f"База не найдена: {db_path}")
         return 1
 
-    storage = Storage(settings.db_path)
+    storage = Storage(db_path)
     try:
         if args.session_id is None:
             run_interactive(storage)

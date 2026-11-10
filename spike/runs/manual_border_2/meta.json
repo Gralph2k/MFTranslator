@@ -1,0 +1,8 @@
+{
+  "scenario": "first_message",
+  "persona": "average / ручной прогон (Gemini)",
+  "mode": "живой человек (без рамки тренажёра и советов)",
+  "turn_limit": 12,
+  "turns_played": 12,
+  "ended_by": "unclear"
+}

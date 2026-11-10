@@ -59,8 +59,15 @@ def render_call_screen(scenario: Scenario) -> Path | None:
         return None
 
     target = CALL_DIR / scenario.id / "call.jpg"
-    # Перерисовываем только если фото новее готового экрана.
-    if target.is_file() and target.stat().st_mtime >= source.stat().st_mtime:
+    # Перерисовываем, если фото, код экрана или данные сценария новее файла.
+    code_stamp = Path(__file__).stat().st_mtime
+    data_stamp = 0.0
+    data_file = scenario.dir / "scenario.json"
+    if data_file.is_file():
+        data_stamp = data_file.stat().st_mtime
+    if target.is_file() and target.stat().st_mtime >= max(
+        source.stat().st_mtime, code_stamp, data_stamp
+    ):
         return target
 
     target.parent.mkdir(parents=True, exist_ok=True)

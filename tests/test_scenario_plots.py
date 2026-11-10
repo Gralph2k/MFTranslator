@@ -73,3 +73,19 @@ def test_first_call_is_about_the_phone_call_not_the_meeting():
     assert "одноклассниц" not in text
     # Это не свидание: в кофейне они ещё не сидели вместе.
     assert "кофейне" not in text
+
+
+def test_eva_message_is_about_her_life_not_vera():
+    """Ева — отдельная героиня: фотографии, мотоцикл, поездки; без сюжета Веры."""
+    scenario = load_scenario("eva_message")
+    text = _text(scenario)
+
+    assert "съёмк" in text or "фотограф" in text
+    assert "мотоцикл" in text or "поездк" in text
+    for vera_detail in ("сальса", "караоке", "издательств", "метро, книга", "редактор"):
+        assert vera_detail not in text, f"в сценарий Евы протёк сюжет Веры: {vera_detail}"
+    assert "клава" not in text
+    assert "одноклассниц" not in text
+    # Это переписка до встречи, а не свидание в кофейне.
+    assert "кофейн" not in text or "кафе" in text
+

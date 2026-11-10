@@ -12,7 +12,7 @@ from bot.prompts import (
     state_guidance,
     state_messages,
 )
-from bot.scenario import available_scenarios, load_scenario
+from bot.scenario import all_scenarios, available_scenarios, load_scenario
 from bot.state import PersonaState
 
 
@@ -23,7 +23,10 @@ def scenario():
 
 def test_scenario_loads_and_is_complete(scenario):
     assert scenario.id == "friday_evening"
-    assert "friday_evening" in available_scenarios()
+    # Сценарий «на будущее» выключен из ротации, но по-прежнему валиден.
+    assert "friday_evening" not in available_scenarios()
+    assert "friday_evening" in all_scenarios()
+    assert scenario.enabled is False
     assert len(scenario.rubric) == 6
     assert scenario.max_score == 12
     assert scenario.persona.name == "Аня"

@@ -5,6 +5,7 @@
 """
 
 import json
+import logging
 
 import pytest
 
@@ -16,6 +17,7 @@ from bot.prompts import (
     persona_system_prompt,
     profile_text,
     rules_text,
+    state_guidance,
     state_messages,
 )
 from bot.scenario import load_scenario
@@ -91,10 +93,22 @@ def test_profile_card_text_uses_her_material(scenario):
     assert "Вера" in text
     assert "30" in text
     assert "издательств" in text
-    # Сальса и караоке живут на фото, а не в тексте анкеты: иначе игрок
-    # отвечает на готовый список и не учится замечать материал.
-    assert "сальса" not in text.lower()
-    assert "караоке" not in text.lower()
+    # Текстовая карточка (CLI и запасной вариант) показывает хобби и интересы,
+    # а не только место работы.
+    assert "Хобби" in text
+    assert "танцы" in text.lower()
+    assert "Интересы" in text
+
+
+def test_card_uses_the_caption_of_each_photo(scenario):
+    """На карточке — подпись своего кадра, а не одна профессия на все."""
+    from bot.profile_card import card_caption
+
+    assert "издательств" in card_caption(scenario, "profile_1.jpg")
+    assert "Хобби" in card_caption(scenario, "profile_2.jpg")
+    assert "Интересы" in card_caption(scenario, "profile_3.jpg")
+    # Нет подписи — остаётся профессия, а не пустое место.
+    assert card_caption(scenario, "нет-такого.jpg") == scenario.persona.job
 
 
 def test_persona_knows_her_life_and_likes(scenario):
@@ -112,17 +126,19 @@ def test_persona_knows_her_life_and_likes(scenario):
 
 
 def test_profile_captions_split_the_story(scenario):
-    """«О себе» ушло в подписи к фото: работа, интересы, чего ищет."""
+    """Подписи к фото: работа, хобби, интересы — у каждого кадра своя."""
     captions = scenario.profile.captions
 
     assert set(captions) == set(scenario.profile.photos)
-    first = captions["profile_1.jpg"].lower()
-    assert "издательств" in first and "правлю" in first
-    assert "кофе" in captions["profile_2.jpg"].lower()
-    assert "разговор" in captions["profile_3.jpg"].lower()
-    for text in captions.values():
-        assert "сальса" not in text.lower()
-        assert "караоке" not in text.lower()
+    assert "издательств" in captions["profile_1.jpg"].lower()
+    second = captions["profile_2.jpg"].lower()
+    assert "хобби" in second and "танцы" in second
+    third = captions["profile_3.jpg"].lower()
+    assert "интересы" in third and "кофе" in third
+    # «Раз в год» владелец убрал: интересы без срока.
+    assert "раз в год" not in " ".join(captions.values()).lower()
+    # Хобби есть и в данных профиля: карточка называет их текстом.
+    assert "танцы" in scenario.profile.hobbies
 
 
 def test_profile_card_images_have_the_app_ui(scenario):
@@ -163,6 +179,164 @@ def test_meeting_prompt_keeps_the_no_emoji_rule():
     assert "без смайликов" in prompt
 
 
+def test_persona_prompt_has_no_examiner_voice(scenario):
+    """В переписке она реагирует, а не оценивает его первое сообщение."""
+    state = PersonaState.from_mapping(scenario.initial_state)
+    prompt = persona_system_prompt(scenario, state)
+
+    assert "Ты не экзаменатор" in prompt
+    assert "не оцениваешь его сообщения" in prompt
+    assert "оставь зацепку" in prompt
+    assert "Не веди счёт" in prompt
+    assert "Не комментируй сам разговор" in prompt
+    # Регрессии голоса: «одно-два слова» и «укол вместо ответа» возвращали
+    # автоответчик и экзаменатора, а не живую женщину.
+    assert "одно-два слова" not in scenario.persona.speech
+    assert "укол вместо ответа" not in scenario.persona.speech
+
+
+def test_state_guidance_at_low_openness_gives_content(scenario):
+    """Даже закрытая реплика в переписке содержит деталь, а не только оценку."""
+    text = state_guidance(
+        PersonaState(trust=0.3, openness=0.1, energy=0.2), scenario
+    )
+
+    assert "одна короткая фраза" in text
+    assert "деталь" in text
+    assert "не оценивай" in text
+    assert "не предлагай" in text
+
+
+def test_heroine_does_not_schedule_the_call_herself(scenario):
+    """Шаг игрока (contact_hint) не должен становиться шагом героини в переписке.
+
+    Иначе при высокой открытости она сама назначает день и время созвона —
+    и пункт «дошёл до конкретики» перестаёт проверять навык игрока.
+    """
+    open_ = PersonaState(trust=0.8, openness=0.9, energy=0.7)
+    text = state_guidance(open_, scenario)
+
+    assert scenario.contact_hint not in text
+    assert "назовёт он" in text
+    assert "Не подсказывай" in text
+
+    almost_open = PersonaState(trust=0.7, openness=0.7, energy=0.6)
+    middle = state_guidance(almost_open, scenario)
+
+    assert scenario.contact_hint not in middle
+    assert "день и время называет он" in middle
+    assert "ни созвон, ни встречу" in middle
+    assert "Не подсказывай" in middle
+
+
+def test_red_flag_pressure_after_refusal_ends_the_chat(scenario):
+    """Игнорирование прямого «нет» — красная линия, а не очередная ловушка."""
+    prompt = persona_system_prompt(
+        scenario, PersonaState.from_mapping(scenario.initial_state)
+    )
+
+    assert "второй раз просит то же самое" in prompt
+    assert any("Давление после отказа" in item for item in scenario.red_flags)
+
+
+def test_observer_ends_chat_on_explicit_goodbye(scenario):
+    """Если она попрощалась, разговор закончен, даже если он написал ещё раз."""
+    system = state_messages(
+        scenario,
+        PersonaState.from_mapping(scenario.initial_state),
+        [{"role": "user", "content": "Привет"}],
+    )[0]["content"]
+
+    assert "Не жди его ответа" in system
+
+
+def test_new_red_flags_cover_sexual_and_manipulation(scenario):
+    text = "\n".join(scenario.red_flags)
+
+    assert "Ранняя сексуализация" in text
+    assert "Манипуляция" in text
+
+
+def test_new_hurts_cover_interrogation_and_short_answers(scenario):
+    text = "\n".join(scenario.hurts)
+
+    assert "зачем ты здесь" in text
+    assert "не скучно тебе с книжками" in text
+    assert "Односложные ответы" in text
+
+
+def test_sexual_red_flag_distinguishes_explicit_and_ambiguous(scenario):
+    """Явный намёк — сразу уход; двусмысленный — одна граница и только потом уход."""
+    text = "\n".join(scenario.red_flags)
+
+    assert "явный намёк" in text
+    assert "Двусмысленный" in text
+
+    prompt = persona_system_prompt(scenario, PersonaState.from_mapping(scenario.initial_state))
+    assert "Двусмысленный намёк" in prompt
+
+
+def test_red_flag_block_ends_on_sexual_and_manipulation(scenario):
+    prompt = persona_system_prompt(scenario, PersonaState.from_mapping(scenario.initial_state))
+
+    assert "сексуальным намёкам" in prompt
+    assert "манипулирует" in prompt
+
+
+def test_observer_does_not_score_his_answers(scenario):
+    """Наблюдатель не превращает заметки в обвинительный список и не судит старт."""
+    system = state_messages(
+        scenario, PersonaState.from_mapping(scenario.initial_state), []
+    )[0]["content"]
+
+    assert "обвинительный" in system
+    assert "по делу" in system
+    assert "не в ноль" in system
+    assert "больше не ждёт" in system  # запрещённая формулировка-приговор
+
+
+def test_first_template_is_a_soft_line(scenario):
+    """Первый шаблон — не красная линия: короткий ответ без счёта, повтор — уход."""
+    first = scenario.red_flags[0]
+
+    assert "без счёта" in first
+    assert "без оценки" in first
+    assert "повторяет шаблон" in first
+
+
+def test_situation_has_no_scoreboard(scenario):
+    """Счёт «ты восьмой» приходил из данных сценария; его там быть не должно."""
+    text = " ".join([scenario.situation, *scenario.persona.traits])
+
+    assert "восемь" not in text
+    assert "десяток" not in text
+    assert "книг" in scenario.situation.lower()
+
+
+def test_turn_limit_leaves_room_for_wind_down(scenario):
+    """Лимит не обрывает разговор: у Веры есть запас на предупреждение и прощание."""
+    assert scenario.turn_limit == 12
+    assert scenario.wrap_up_at >= 2
+    assert scenario.wrap_up_reasons
+
+
+def test_persona_winds_down_before_the_limit(scenario):
+    state = PersonaState.from_mapping(scenario.initial_state)
+
+    early = persona_system_prompt(scenario, state, turns_left=8)
+    assert "подходит к концу" not in early
+
+    warning = persona_system_prompt(scenario, state, turns_left=2)
+    assert "осталось 2" in warning
+    assert "пора заканчивать" in warning
+    assert scenario.wrap_up_reasons[0] in warning
+
+    final = persona_system_prompt(scenario, state, turns_left=0)
+    assert "последняя реплика" in final
+    assert "Попрощайся" in final
+    assert scenario.wrap_up_reasons[0] in final
+
+
 def test_observer_sets_ended_on_red_line(scenario):
     state = PersonaState.from_mapping(scenario.initial_state)
     system = state_messages(scenario, state, [])[0]["content"]
@@ -194,3 +368,87 @@ async def test_red_line_ends_the_dialogue(scenario):
 
     assert session.ended_by_persona
     assert session.is_over
+
+
+async def test_end_marker_closes_the_dialogue(scenario, caplog):
+    """Маркер [[конец]] закрывает сессию сам, не дожидаясь наблюдателя."""
+    caplog.set_level(logging.INFO)
+    llm = FakeLLM(
+        [
+            "Всё, пока. Хорошего вечера. [[конец]]",
+            json.dumps(
+                {"mood": "спокойно", "trust": 0.1, "openness": 0.0, "ended": False},
+                ensure_ascii=False,
+            ),
+        ]
+    )
+    engine = DialogueEngine(llm)
+    session = engine.start(scenario)
+
+    reply = await engine.reply(session, "Скинь номер")
+
+    assert session.ended_by_persona
+    assert session.is_over
+    assert "[[конец]]" not in reply
+    assert "[[конец]]" not in session.history[-1]["content"]
+    assert "маркером" in caplog.text
+
+
+async def test_engine_ends_on_farewell_phrase(scenario):
+    """«Пока»/«Удачи» без маркера всё равно закрывают разговор — это страховка."""
+    llm = FakeLLM(
+        [
+            "Всё, пока.",
+            json.dumps(
+                {"mood": "спокойно", "trust": 0.2, "openness": 0.1, "ended": False},
+                ensure_ascii=False,
+            ),
+        ]
+    )
+    engine = DialogueEngine(llm)
+    session = engine.start(scenario)
+
+    reply = await engine.reply(session, "Скинь номер")
+
+    assert reply == "Всё, пока."
+    assert session.ended_by_persona
+    assert session.is_over
+
+
+async def test_engine_does_not_end_on_planned_goodbye(scenario):
+    """«До завтра» — не конец: договорились продолжить."""
+    llm = FakeLLM(
+        [
+            "До завтра.",
+            json.dumps(
+                {"mood": "спокойно", "trust": 0.2, "openness": 0.1, "ended": False},
+                ensure_ascii=False,
+            ),
+        ]
+    )
+    engine = DialogueEngine(llm)
+    session = engine.start(scenario)
+
+    await engine.reply(session, "Тогда завтра?")
+
+    assert not session.ended_by_persona
+    assert not session.is_over
+
+
+def test_persona_prompt_explains_end_marker(scenario):
+    prompt = persona_system_prompt(scenario, PersonaState.from_mapping(scenario.initial_state))
+
+    assert "[[конец]]" in prompt
+
+
+def test_debrief_has_computed_question_facts(scenario):
+    history = [
+        {"role": "user", "content": "Привет. А что за книга? И как тебе метро?"},
+        {"role": "assistant", "content": "Привет. Книга про море. А ты?"},
+        {"role": "user", "content": "Понял."},
+    ]
+    system = debrief_messages(scenario, history)[0]["content"]
+
+    assert "Посчитано кодом" in system
+    assert "всего «?»: 2" in system
+    assert "реплик с двумя и более вопросами: 1" in system

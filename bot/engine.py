@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .llm import LLM, LLMError, parse_json_object
-from .prompts import debrief_messages, persona_messages, state_messages
+from .prompts import END_MARKER, debrief_messages, persona_messages, state_messages
 from .safety import CrisisDetected, detect_crisis
 from .scenario import RubricItem, Scenario
 from .state import PersonaState
@@ -15,6 +15,27 @@ from .state import PersonaState
 log = logging.getLogger(__name__)
 
 MAX_REPLY_CHARS = 700
+
+# Прощания, после которых разговор точно закончен. Страховка на случай, когда модель
+# не поставила маркер: героиня, сказавшая «пока» и продолжившая отвечать, выглядит
+# сломанной, и игрок этим пользуется.
+FAREWELL_ENDINGS = (
+    "пока",
+    "удачи",
+    "всего хорошего",
+    "до свидания",
+    "не пиши",
+    "не пиши мне больше",
+    "больше не пиши",
+    "на этом всё",
+    "разговор закончен",
+    "разговор окончен",
+)
+
+
+def _ends_with_farewell(text: str) -> bool:
+    tail = " ".join(text.split()).rstrip(" .!?…)\"'»").lower()
+    return any(tail.endswith(marker) for marker in FAREWELL_ENDINGS)
 
 
 @dataclass
@@ -116,18 +137,41 @@ class DialogueEngine:
 
         raw = await self.llm.complete(
             persona_messages(
-                session.scenario, session.state, session.history, session.previous
+                session.scenario,
+                session.state,
+                session.history,
+                session.previous,
+                turns_left=session.turns_left,
             ),
             json_mode=False,
             temperature=0.85,
         )
         reply, embedded_state, ended = _parse_persona_reply(raw)
+        # Явный маркер прощания надёжнее наблюдателя: героиня сказала «пока» — сессия
+        # закрывается сразу, и следующая реплика игрока уже не обрабатывается.
+        marker_ended = END_MARKER in raw
+        if marker_ended:
+            log.info(
+                "сессия %s (%s): героиня закончила разговор маркером",
+                session.session_id,
+                session.scenario.id,
+            )
+            reply = reply.replace(END_MARKER, "").strip() or "Пока."
+        farewell_ended = _ends_with_farewell(reply)
+        if farewell_ended and not marker_ended:
+            log.info(
+                "сессия %s (%s): разговор закончен по фразе прощания",
+                session.session_id,
+                session.scenario.id,
+            )
 
         if embedded_state is None:
             # Обычный текстовый ответ: состояние оцениваем отдельным запросом.
-            state_delta, ended = await self._read_state(session)
+            state_delta, observed_ended = await self._read_state(session)
+            ended = ended or observed_ended
         else:
             state_delta = embedded_state
+        ended = ended or marker_ended or farewell_ended
 
         session.state.apply(state_delta)
         session.ended_by_persona = ended

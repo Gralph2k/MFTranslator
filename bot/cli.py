@@ -15,7 +15,7 @@ from .engine import DialogueEngine
 from .llm import DeepSeekLLM, LLM
 from .prompts import backstory_text, profile_text, rules_text
 from .safety import CrisisDetected, safety_message
-from .scenario import load_scenario
+from .scenario import available_scenarios, load_scenario
 
 # Строка рубрики в промпте методиста: «- noticing («Заметил состояние», 0..2): ...».
 # По ней демо-режим собирает баллы под тот сценарий, который играют, а не под один зашитый.
@@ -67,7 +67,12 @@ class DemoLLM:
         return None
 
 
-def build_llm(provider: str, settings: Settings, medium: str = "in_person") -> LLM:
+def build_llm(
+    provider: str,
+    settings: Settings,
+    medium: str = "in_person",
+    demo_replies: list[str] | None = None,
+) -> LLM:
     if provider == "deepseek":
         if not settings.has_llm:
             raise SystemExit(
@@ -79,7 +84,8 @@ def build_llm(provider: str, settings: Settings, medium: str = "in_person") -> L
             base_url=settings.deepseek_base_url,
             model=settings.deepseek_model,
         )
-    return DemoLLM(_demo_replies(medium), _demo_debrief())
+    replies = list(demo_replies) if demo_replies else _demo_replies(medium)
+    return DemoLLM(replies, _demo_debrief())
 
 
 def _demo_replies(medium: str = "in_person") -> list[str]:
@@ -88,7 +94,7 @@ def _demo_replies(medium: str = "in_person") -> list[str]:
         # Переписка в приложении: та же Вера, но пока только текстом.
         # Смайлики — только на яркой эмоции, не в каждой реплике.
         return [
-            "Ну привет 🙂 Ты первый сегодня, кто спросил не «как дела».",
+            "Ну привет. Еду из издательства, злюсь на чужую запятую. А ты чем занят?",
             "Сальса — это не «научиться», это «перестать думать». Ладно, расскажу.",
             "Слушай, давай в четверг после девяти? Только чур без «покажи, что умеешь» 😄",
         ]
@@ -162,7 +168,9 @@ def _print_profile(scenario) -> None:
 async def run(provider: str, scenario_name: str) -> int:
     settings = load_settings()
     scenario = load_scenario(scenario_name)
-    llm = build_llm(provider, settings, scenario.medium)
+    llm = build_llm(
+        provider, settings, scenario.medium, list(scenario.demo_replies)
+    )
     engine = DialogueEngine(llm)
     # В созвоне персонаж опирается на канонную переписку: в CLI у игрока нет
     # сохранённой прошлой попытки, как в боте, поэтому берём канон.
@@ -247,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description="Локальный прогон сценария")
     parser.add_argument("--provider", choices=["demo", "deepseek"], default="demo")
-    parser.add_argument("--scenario", default="friday_evening")
+    parser.add_argument("--scenario", default=available_scenarios()[0])
     args = parser.parse_args(argv)
     return asyncio.run(run(args.provider, args.scenario))
 

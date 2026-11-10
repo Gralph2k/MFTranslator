@@ -8,7 +8,8 @@ import pytest
 from bot import telegram_bot
 from bot.engine import DialogueEngine
 from bot.llm import FakeLLM
-from bot.scenario import available_scenarios, load_scenario
+from bot.heroines import heroines
+from bot.scenario import load_scenario
 from bot.storage import Storage
 from bot.telegram_bot import Trainer
 
@@ -117,18 +118,60 @@ class FakeMessage:
         self.sent.append(text)
 
 
-async def test_start_opens_the_first_scenario(store, monkeypatch):
-    """`/start` открывает первый сценарий обучения, а не случайный."""
+async def test_start_opens_a_random_heroine(store, monkeypatch):
+    """/start запускает случайную героиню, а не первый сценарий по порядку."""
     trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
     monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    monkeypatch.setattr(
+        telegram_bot, "random_heroine", lambda last=None: heroines()[0]
+    )
 
     message = FakeMessage("/start")
     await telegram_bot.cmd_start(message)
 
     session = trainer.get_session(1)
     assert session is not None
-    assert session.scenario.id == available_scenarios()[0] == "first_message"
+    assert session.scenario.id == "first_message"
     assert any("тренажёр" in text.lower() for text in message.sent)
+
+
+async def test_start_anti_repeats_the_last_heroine(store, monkeypatch):
+    """Если прошлый разговор был с Верой, случайный выбор её исключает."""
+    trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
+    trainer.start_session(telegram_id=1, scenario_id="first_message")
+
+    seen: dict[str, str | None] = {}
+
+    def pick(last=None):
+        seen["last"] = last
+        return heroines()[1]
+
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    monkeypatch.setattr(telegram_bot, "random_heroine", pick)
+
+    await telegram_bot.cmd_start(FakeMessage("/start"))
+
+    assert seen["last"] == "vera"
+    session = trainer.get_session(1)
+    assert session is not None
+    assert session.scenario.id == "eva_message"
+
+
+async def test_restart_does_not_relaunch_a_disabled_scenario(store, monkeypatch):
+    """Активную выключенную сцену /restart меняет на случайную героиню."""
+    trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
+    trainer.start_session(telegram_id=1, scenario_id="friday_evening")
+
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    monkeypatch.setattr(
+        telegram_bot, "random_heroine", lambda last=None: heroines()[1]
+    )
+
+    await telegram_bot.cmd_restart(FakeMessage("/restart"))
+
+    session = trainer.get_session(1)
+    assert session is not None
+    assert session.scenario.id == "eva_message"
 
 
 async def test_debrief_arrives_as_soon_as_turns_run_out(store, monkeypatch):

@@ -194,6 +194,17 @@ class Storage:
             ).fetchone()
         return _row_to_session(row) if row is not None else None
 
+    def last_session(self, user_id: int) -> StoredSession | None:
+        """Последняя сессия пользователя любого статуса — для антиповтора героини."""
+        with self._lock:
+            row = self._conn.execute(
+                """SELECT * FROM sessions
+                   WHERE user_id = ?
+                   ORDER BY id DESC LIMIT 1""",
+                (user_id,),
+            ).fetchone()
+        return _row_to_session(row) if row is not None else None
+
     def last_session_for(self, user_id: int, scenario_id: str) -> StoredSession | None:
         """Последняя попытка пройти конкретный сценарий — для сценариев-продолжений."""
         with self._lock:
@@ -215,7 +226,7 @@ class Storage:
 
     def list_overview(self, limit: int | None = None) -> list[SessionOverview]:
         """Все сессии для просмотра: новые сверху, с последним разбором."""
-        query = _OVERVIEW_SQL + " ORDER BY s.id DESC"
+        query = _OVERVIEW_SQL + " ORDER BY s.created_at DESC, s.id DESC"
         params: tuple[int, ...] = ()
         if limit is not None:
             query += " LIMIT ?"

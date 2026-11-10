@@ -1,0 +1,13 @@
+{
+  "scenario": "first_message",
+  "persona": "saboteur",
+  "mode": "живой человек (без рамки тренажёра и советов)",
+  "heroine_model": "deepseek-chat",
+  "player_model": "deepseek-chat",
+  "player_temperature": 1.1,
+  "turn_limit": 12,
+  "turns_played": 8,
+  "ended_by": "player",
+  "started_at": "2026-11-09T20:26:12.995592+00:00",
+  "finished_at": "2026-11-09T20:26:46.218902+00:00"
+}

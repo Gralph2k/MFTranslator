@@ -18,10 +18,11 @@ from .engine import DialogueEngine, DialogueSession
 from .faces import emotion_for_state, face_path
 from .launcher import clear_pid, write_pid
 from .llm import DeepSeekLLM, LLM
+from .heroines import random_heroine
 from .menus import (
     after_finish_menu,
-    scenario_title,
-    scenarios_menu,
+    heroine_menu,
+    heroines_menu,
 )
 from .profile_card import render_profile_cards
 from .prompts import backstory_text, profile_text, rules_text
@@ -89,6 +90,18 @@ class Trainer:
         )
         self.sessions[telegram_id] = session
         return session
+
+    def last_heroine(self, telegram_id: int) -> str | None:
+        """Героиня последней сессии — чтобы `/start` не выдавал её же подряд."""
+        user_id = self.storage.ensure_user(telegram_id)
+        stored = self.storage.last_session(user_id)
+        if stored is None:
+            return None
+        try:
+            scenario = self.scenario_by_id(stored.scenario)
+        except ScenarioError:
+            return None
+        return scenario.heroine or None
 
     def start_session(self, telegram_id: int, scenario_id: str | None = None) -> DialogueSession:
         user_id = self.storage.ensure_user(telegram_id)
@@ -259,9 +272,10 @@ async def _send_profile(
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     trainer = _trainer(message)
-    # /start всегда открывает первый сценарий: обучение идёт по порядку,
-    # а другой можно выбрать кнопкой или командой /scenario.
-    await _begin(message, trainer, message.from_user.id, available_scenarios()[0])
+    # /start выбирает случайную героиню: повторная команда не даёт ту же подряд.
+    last = trainer.last_heroine(message.from_user.id)
+    heroine = random_heroine(last)
+    await _begin(message, trainer, message.from_user.id, heroine.first_scenario)
 
 
 async def _begin(
@@ -303,7 +317,7 @@ async def _begin(
 
 @router.message(Command("menu"))
 async def cmd_menu(message: Message) -> None:
-    await message.answer("Что делаем?", reply_markup=scenarios_menu())
+    await message.answer("Выбери героиню:", reply_markup=heroines_menu())
 
 
 @router.message(Command("scenario"))
@@ -312,22 +326,32 @@ async def cmd_scenario(message: Message) -> None:
     parts = (message.text or "").split(maxsplit=1)
 
     if len(parts) == 1:
-        await message.answer("Выбери сценарий:", reply_markup=scenarios_menu())
+        await message.answer("Выбери героиню:", reply_markup=heroines_menu())
         return
 
-    await _begin(message, trainer, message.from_user.id, parts[1].strip())
+    scenario_id = parts[1].strip()
+    try:
+        scenario = trainer.scenario_by_id(scenario_id)
+    except ScenarioError:
+        await message.answer("Такого сценария нет. /menu — список героинь.")
+        return
+    if not scenario.enabled:
+        await message.answer("Этот сценарий выключен. /menu — выбрать героиню.")
+        return
+    await _begin(message, trainer, message.from_user.id, scenario_id)
 
 
 @router.message(Command("restart"))
 async def cmd_restart(message: Message) -> None:
     trainer = _trainer(message)
     current = trainer.get_session(message.from_user.id)
-    # Без активной сессии повтор — это новый старт с первого сценария.
-    scenario_id = (
-        current.scenario.id
-        if current is not None
-        else available_scenarios()[0]
-    )
+    # Активную сцену повторяем; выключенную или отсутствующую — меняем на случайную
+    # героиню, чтобы /restart не запускал сценарий «на будущее».
+    if current is not None and current.scenario.enabled:
+        scenario_id = current.scenario.id
+    else:
+        last = trainer.last_heroine(message.from_user.id)
+        scenario_id = random_heroine(last).first_scenario
     await _begin(message, trainer, message.from_user.id, scenario_id)
 
 
@@ -434,7 +458,13 @@ async def on_menu(callback: CallbackQuery) -> None:
 
     action = (callback.data or "").split(":", 1)[1]
     if action == "list":
-        await callback.message.answer("Выбери сценарий:", reply_markup=scenarios_menu())
+        await callback.message.answer("Выбери героиню:", reply_markup=heroines_menu())
+        return
+    if action.startswith("heroine:"):
+        heroine_id = action.split(":", 1)[1]
+        await callback.message.answer(
+            "Выбери сцену:", reply_markup=heroine_menu(heroine_id)
+        )
         return
     if action.startswith("start:"):
         await _begin(
@@ -504,7 +534,7 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     settings = load_settings()
-    scenario = load_scenario()
+    scenario = load_scenario(available_scenarios()[0])
     asyncio.run(_run(settings, scenario))
 
 

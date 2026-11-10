@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "defaultMode": "default",
+    "allow": [
+      "Bash(.venv/Scripts/python.exe -m pytest *)",
+      "Bash(python -m pytest *)",
+      "Bash(.venv/Scripts/python.exe -m bot.cli *)",
+      "Bash(python -m bot.cli *)",
+      "Bash(.venv/Scripts/python.exe -m bot.doctor)",
+      "Bash(python -m bot.doctor)",
+      "Bash(.venv/Scripts/python.exe -m bot.launcher *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
+      "Bash(git rev-parse *)",
+      "Bash(git ls-files *)",
+      "PowerShell(.venv\\Scripts\\python.exe -m pytest *)",
+      "PowerShell(.\\.venv\\Scripts\\python.exe -m pytest *)",
+      "PowerShell(.venv\\Scripts\\python.exe -m bot.cli *)",
+      "PowerShell(.\\.venv\\Scripts\\python.exe -m bot.cli *)",
+      "PowerShell(.venv\\Scripts\\python.exe -m bot.doctor)",
+      "PowerShell(.venv\\Scripts\\python.exe -m bot.launcher *)",
+      "PowerShell(python -m pytest *)",
+      "PowerShell(python -m bot.cli *)",
+      "PowerShell(git status *)",
+      "PowerShell(git diff *)",
+      "PowerShell(git log *)",
+      "PowerShell(git show *)",
+      "PowerShell(git branch *)",
+      "PowerShell(git rev-parse *)",
+      "PowerShell(git ls-files *)",
+      "PowerShell(Get-ChildItem *)"
+    ],
+    "ask": [
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(rsync *)",
+      "Bash(tar *)",
+      "Bash(systemctl *)",
+      "Bash(chown *)",
+      "Bash(chmod *)",
+      "Bash(pip install *)",
+      "Bash(sudo *)",
+      "PowerShell(ssh *)",
+      "PowerShell(scp *)",
+      "PowerShell(tar *)",
+      "PowerShell(systemctl *)",
+      "PowerShell(pip install *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.production)",
+      "Bash(git push *)",
+      "Bash(git push)",
+      "PowerShell(git push *)"
+    ]
+  },
+  "env": {
+    "PYTHONIOENCODING": "utf-8",
+    "UV_CACHE_DIR": "C:\\Projects\\MFTranslator\\.uv-cache"
+  }
+}

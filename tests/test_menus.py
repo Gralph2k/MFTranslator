@@ -1,10 +1,12 @@
+"""Меню героинь: две ступени, «Продолжить» и никаких выключенных сценариев."""
+
+from bot.heroines import heroines
 from bot.menus import (
     after_finish_menu,
-    next_scenario_id,
-    scenario_pick,
+    heroine_menu,
+    heroines_menu,
+    heroines_pick,
     scenario_title,
-    scenario_titles,
-    scenarios_menu,
 )
 
 
@@ -12,50 +14,73 @@ def _callbacks(markup) -> list[str]:
     return [button.callback_data for row in markup.inline_keyboard for button in row]
 
 
-def test_titles_cover_every_scenario():
-    titles = scenario_titles()
-    assert "friday_evening" in titles
-    assert "reunion_call" in titles
-    assert "first_message" in titles
-    assert scenario_title("friday_evening") == "Пятничный вечер"
+def _texts(markup) -> list[str]:
+    return [button.text for row in markup.inline_keyboard for button in row]
 
 
-def test_next_scenario_wraps_around():
-    ids = list(scenario_titles())
-    assert next_scenario_id(ids[0]) == ids[1]
-    assert next_scenario_id(ids[-1]) == ids[0]
-    assert next_scenario_id("нет-такого") == ids[0]
+def test_heroines_menu_lists_only_active_heroines():
+    markup = heroines_menu()
+
+    assert _callbacks(markup) == ["menu:heroine:vera", "menu:heroine:eva"]
+    texts = _texts(markup)
+    assert texts[0].startswith("Вера, 30")
+    assert texts[1].startswith("Ева, 26")
 
 
-def test_after_finish_offers_replay_and_next():
-    callbacks = _callbacks(after_finish_menu("friday_evening"))
+def test_heroine_menu_lists_scenarios_in_story_order():
+    markup = heroine_menu("vera")
 
-    assert "menu:start:friday_evening" in callbacks
-    assert "menu:start:reunion_call" in callbacks
-    assert "menu:list" in callbacks
-
-
-def test_scenarios_menu_lists_all_scenarios():
-    callbacks = _callbacks(scenarios_menu())
-    assert len(callbacks) == len(scenario_titles())
-    assert all(data.startswith("menu:start:") for data in callbacks)
-
-
-def test_first_message_goes_first_in_the_menu():
-    """`order` задаёт место в списке: обучение начинается с первой переписки."""
-    assert list(scenario_titles())[0] == "first_message"
-
-
-def test_call_goes_between_the_chat_and_the_date():
-    """Прогрессия: переписка в приложении, созвон, потом первое свидание."""
-    assert list(scenario_titles())[:3] == [
-        "first_message",
-        "first_call",
-        "first_date",
+    assert _callbacks(markup) == [
+        "menu:start:first_message",
+        "menu:start:first_call",
+        "menu:start:first_date",
+        "menu:list",
     ]
 
 
-def test_pick_button_opens_the_list():
-    markup = scenario_pick()
+def test_eva_has_a_single_chat_scenario():
+    assert _callbacks(heroine_menu("eva")) == ["menu:start:eva_message", "menu:list"]
+
+
+def test_disabled_scenarios_are_not_in_any_menu():
+    callbacks = _callbacks(heroines_menu()) + _callbacks(heroine_menu("vera"))
+    assert "menu:start:friday_evening" not in callbacks
+    assert "menu:start:reunion_call" not in callbacks
+
+
+def test_unknown_heroine_falls_back_to_the_list():
+    assert _callbacks(heroine_menu("нет-такой")) == _callbacks(heroines_menu())
+
+
+def test_after_finish_continues_vera_chain():
+    markup = after_finish_menu("first_message")
+    callbacks = _callbacks(markup)
+
+    assert callbacks[0] == "menu:start:first_call"
+    assert "menu:start:first_call" in callbacks
+    assert "menu:list" in callbacks
+    assert any("Продолжить: Вера" in text for text in _texts(markup))
+
+
+def test_after_date_moves_to_the_next_heroine():
+    markup = after_finish_menu("first_date")
+    callbacks = _callbacks(markup)
+
+    assert callbacks[0] == "menu:start:eva_message"
+    assert any("Продолжить: Ева" in text for text in _texts(markup))
+
+
+def test_after_eva_returns_to_vera():
+    assert _callbacks(after_finish_menu("eva_message"))[0] == "menu:start:first_message"
+
+
+def test_pick_button_opens_the_heroine_list():
+    markup = heroines_pick()
+
     assert _callbacks(markup) == ["menu:list"]
-    assert markup.inline_keyboard[0][0].text == "Выбор сценария"
+    assert _texts(markup) == ["Выбрать героиню"]
+
+
+def test_scenario_title_is_readable():
+    assert scenario_title("first_message") == "Первое сообщение"
+    assert len(heroines()) == 2

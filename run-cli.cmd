@@ -14,9 +14,9 @@ set "PROVIDER=demo"
 set /p "PROVIDER=Provider [demo/deepseek]: "
 if "%PROVIDER%"=="" set "PROVIDER=demo"
 
-set "SCENARIO=friday_evening"
-set /p "SCENARIO=Scenario [friday_evening/reunion_call]: "
-if "%SCENARIO%"=="" set "SCENARIO=friday_evening"
+set "SCENARIO=first_message"
+set /p "SCENARIO=Scenario [first_message/first_call/first_date/eva_message]: "
+if "%SCENARIO%"=="" set "SCENARIO=first_message"
 
 ".venv\Scripts\python.exe" -m bot.cli --provider %PROVIDER% --scenario %SCENARIO%
 
