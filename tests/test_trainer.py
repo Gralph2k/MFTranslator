@@ -205,3 +205,77 @@ async def test_finish_does_not_repeat_an_automatic_debrief(store, monkeypatch):
     assert any("уже" in text.lower() for text in message.sent)
     # Второй разбор не записан и лишний запрос к модели не ушёл.
     assert len(llm.calls) == 3
+
+
+async def test_debrief_is_not_delivered_twice(store, monkeypatch):
+    """Прямой повторный вызов разбора — no-op: ни запроса, ни дубля текста."""
+    llm = FakeLLM([DEBRIEF])
+    trainer = Trainer(DialogueEngine(llm), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+
+    session = trainer.start_session(telegram_id=1)
+    session.user_turns = 3
+    await telegram_bot.cmd_finish(FakeMessage("/finish"))
+    second = FakeMessage("x")
+    await telegram_bot._deliver_debrief(second, trainer, 1, session)
+
+    assert len(llm.calls) == 1
+    assert second.sent == []
+
+
+async def test_crisis_message_closes_session_in_database(store, monkeypatch):
+    """После кризисного сообщения сессия закрыта и в памяти, и в базе.
+
+    Иначе следующий текст продолжил бы сцену сразу после сообщения о помощи.
+    """
+    trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    session = trainer.start_session(telegram_id=1)
+
+    message = FakeMessage("Я больше не хочу жить")
+    await telegram_bot.on_text(message)
+
+    assert session.finished is True
+    assert store.get_active_session(store.ensure_user(1)) is None
+    assert any("112" in text for text in message.sent)
+
+
+async def test_rapid_messages_of_one_user_are_serialized(store, monkeypatch):
+    """Два быстрых сообщения обрабатываются по порядку, а не вперемешку.
+
+    aiogram запускает апдейты конкурентно (handle_as_tasks=True): без замка
+    на пользователя второй ход вклинивается до ответа на первый.
+    """
+    import asyncio
+
+    class SlowLLM:
+        """Первый ответ задерживается: без замка второй закончится раньше."""
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def complete(self, messages, *, json_mode=False, temperature=0.8):
+            self.calls += 1
+            if self.calls == 1:
+                await asyncio.sleep(0.05)
+            if json_mode:
+                return json.dumps({"mood": "спокойно"})
+            return "Ладно."
+
+        async def aclose(self) -> None:
+            return None
+
+    llm = SlowLLM()
+    trainer = Trainer(DialogueEngine(llm), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    session = trainer.start_session(telegram_id=1)
+
+    await asyncio.gather(
+        telegram_bot.on_text(FakeMessage("Первое")),
+        telegram_bot.on_text(FakeMessage("Второе")),
+    )
+
+    roles = [m["role"] for m in session.history]
+    # Строгое чередование после opening: ответы не перемешались.
+    assert roles == ["assistant", "user", "assistant", "user", "assistant"]
+    assert session.user_turns == 2

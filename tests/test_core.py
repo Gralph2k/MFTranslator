@@ -228,6 +228,51 @@ def test_parse_json_object_handles_code_fences():
         parse_json_object("просто текст")
 
 
+def test_parse_json_object_strips_talk_around_json():
+    assert parse_json_object('Вот ответ: {"a": 1} — как просил') == {"a": 1}
+
+
+async def test_failed_reply_does_not_consume_a_turn(scenario):
+    """Сбой модели не списывает ход и не оставляет дубль в стенограмме.
+
+    Иначе несколько неудач подряд съедали бы turn_limit без единой реплики,
+    а повторная отправка сообщения дублировала его в истории.
+    """
+    engine = DialogueEngine(FakeLLM([]))  # ответов нет: первый ход падает
+    session = engine.start(scenario)
+    history_before = list(session.history)
+
+    with pytest.raises(LLMError):
+        await engine.reply(session, "Я рядом.")
+
+    assert session.user_turns == 0
+    assert session.history == history_before
+
+
+async def test_reply_uses_state_embedded_in_persona_answer(scenario):
+    """Модель ответила JSON-ом с reply и state: второй запрос не нужен."""
+    before = PersonaState.from_mapping(scenario.initial_state)
+    embedded = json.dumps(
+        {
+            "reply": "Ладно, посижу с тобой.",
+            "state": {"trust": round(before.trust + 0.05, 3)},
+            "ended": False,
+        },
+        ensure_ascii=False,
+    )
+    llm = FakeLLM([embedded])
+    engine = DialogueEngine(llm)
+    session = engine.start(scenario)
+
+    reply = await engine.reply(session, "Я рядом.")
+
+    assert reply == "Ладно, посижу с тобой."
+    assert session.state.trust == pytest.approx(before.trust + 0.05)
+    assert session.user_turns == 1
+    # Отдельный запрос наблюдателя не понадобился.
+    assert len(llm.calls) == 1
+
+
 async def test_reply_updates_state_and_history(scenario):
     state_payload = json.dumps(
         {"mood": "мягче", "trust": 0.9, "openness": 0.8, "energy": 0.4},

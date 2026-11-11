@@ -61,6 +61,17 @@ class Trainer:
         # Telegram хранит загруженный файл у себя: второй раз шлём по file_id,
         # иначе каждый ход тратит время на загрузку полумегабайтной картинки.
         self.face_file_ids: dict[str, str] = {}
+        # Замок на пользователя: aiogram обрабатывает апдейты конкурентно
+        # (start_polling с handle_as_tasks=True), а ходы одного диалога должны
+        # идти по порядку — иначе реплики перемешаются, а разбор задвоится.
+        self._user_locks: dict[int, asyncio.Lock] = {}
+
+    def user_lock(self, telegram_id: int) -> asyncio.Lock:
+        lock = self._user_locks.get(telegram_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._user_locks[telegram_id] = lock
+        return lock
 
     def scenario_by_id(self, scenario_id: str) -> Scenario:
         if scenario_id not in self._scenarios:
@@ -285,34 +296,35 @@ async def _begin(
     scenario_id: str | None = None,
 ) -> None:
     """Начинает сценарий: сначала правила, потом описание и картинки."""
-    try:
-        session = trainer.start_session(telegram_id, scenario_id)
-    except ScenarioError:
-        await target.answer("Такого сценария нет. /menu — список.")
-        return
+    async with trainer.user_lock(telegram_id):
+        try:
+            session = trainer.start_session(telegram_id, scenario_id)
+        except ScenarioError:
+            await target.answer("Такого сценария нет. /menu — список.")
+            return
 
-    trainer.persist(telegram_id, session)
-    # 1. «Это тренажёр», как играть и команды — без подсказки на первый ход.
-    await _send_long(target, rules_text(session.scenario))
+        trainer.persist(telegram_id, session)
+        # 1. «Это тренажёр», как играть и команды — без подсказки на первый ход.
+        await _send_long(target, rules_text(session.scenario))
 
-    if session.scenario.is_correspondence:
-        # 2. Описание сценария, 3. её анкета — подписи с «о себе» разнесены по фото.
-        await _send_long(target, backstory_text(session.scenario))
-        # 3. Анкета с картинками и подписями. «Ход твой» уже сказан в описании,
-        #    поэтому отдельного сообщения с подсказкой нет.
-        await _send_profile(target, trainer, session.scenario)
-    elif session.scenario.is_call:
-        # 2. Описание сцены, 3. экран исходящего звонка, 4. её «алло».
-        await _send_long(target, backstory_text(session.scenario))
-        await _send_call_screen(target, session.scenario)
-        if session.scenario.opening.strip():
-            await target.answer(session.scenario.opening)
-    else:
-        # 2. Описание сцены, 3. первая реплика персонажа приходит с её лицом.
-        await _send_long(target, backstory_text(session.scenario))
-        opening = session.scenario.opening
-        if not await _send_face(target, trainer, session, opening):
-            await target.answer(opening)
+        if session.scenario.is_correspondence:
+            # 2. Описание сценария, 3. её анкета — подписи с «о себе» разнесены по фото.
+            await _send_long(target, backstory_text(session.scenario))
+            # 3. Анкета с картинками и подписями. «Ход твой» уже сказано в описании,
+            #    поэтому отдельного сообщения с подсказкой нет.
+            await _send_profile(target, trainer, session.scenario)
+        elif session.scenario.is_call:
+            # 2. Описание сцены, 3. экран исходящего звонка, 4. её «алло».
+            await _send_long(target, backstory_text(session.scenario))
+            await _send_call_screen(target, session.scenario)
+            if session.scenario.opening.strip():
+                await target.answer(session.scenario.opening)
+        else:
+            # 2. Описание сцены, 3. первая реплика персонажа приходит с её лицом.
+            await _send_long(target, backstory_text(session.scenario))
+            opening = session.scenario.opening
+            if not await _send_face(target, trainer, session, opening):
+                await target.answer(opening)
 
 
 @router.message(Command("menu"))
@@ -358,15 +370,16 @@ async def cmd_restart(message: Message) -> None:
 @router.message(Command("finish"))
 async def cmd_finish(message: Message) -> None:
     trainer = _trainer(message)
-    session = trainer.get_session(message.from_user.id)
-    if session is None or session.user_turns == 0:
-        await message.answer("Разбирать пока нечего: сначала поговори с ней. /start")
-        return
-    if session.debrief_sent:
-        await message.answer("Разбор уже был выше. Новый разговор — /restart.")
-        return
+    async with trainer.user_lock(message.from_user.id):
+        session = trainer.get_session(message.from_user.id)
+        if session is None or session.user_turns == 0:
+            await message.answer("Разбирать пока нечего: сначала поговори с ней. /start")
+            return
+        if session.debrief_sent:
+            await message.answer("Разбор уже был выше. Новый разговор — /restart.")
+            return
 
-    await _deliver_debrief(message, trainer, message.from_user.id, session)
+        await _deliver_debrief(message, trainer, message.from_user.id, session)
 
 
 async def _deliver_debrief(
@@ -375,6 +388,10 @@ async def _deliver_debrief(
     telegram_id: int,
     session: DialogueSession,
 ) -> None:
+    if session.debrief_sent:
+        # Второй разбор того же разговора не тратит запрос и не дублирует текст.
+        # Страховка на случай гонки апдейтов сверх замка пользователя.
+        return
     await target.answer("Секунду, собираю разбор...")
     try:
         debrief = await trainer.engine.debrief(session)
@@ -402,53 +419,56 @@ async def on_text(message: Message) -> None:
     if not text:
         return
 
-    session = trainer.get_session(message.from_user.id)
-    if session is None:
-        await message.answer("Диалог ещё не начат. /start")
-        return
-    if session.is_over:
-        await message.answer(
-            "Этот разговор закончен. Новый — /restart или /menu."
-        )
-        return
+    # Замок держим на весь ход, включая разбор: быстрые сообщения одного
+    # пользователя обрабатываются по порядку и не дублируют разбор.
+    async with trainer.user_lock(message.from_user.id):
+        session = trainer.get_session(message.from_user.id)
+        if session is None:
+            await message.answer("Диалог ещё не начат. /start")
+            return
+        if session.is_over:
+            await message.answer(
+                "Этот разговор закончен. Новый — /restart или /menu."
+            )
+            return
 
-    try:
-        reply = await trainer.engine.reply(session, text)
-    except CrisisDetected:
-        session.finished = True
+        try:
+            reply = await trainer.engine.reply(session, text)
+        except CrisisDetected:
+            session.finished = True
+            trainer.persist(message.from_user.id, session)
+            await _send_long(message, safety_message(trainer.safety_resources))
+            return
+        except Exception as exc:
+            log.exception("reply failed")
+            await message.answer(
+                f"Не получилось ответить: {exc}. Попробуй отправить сообщение ещё раз."
+            )
+            return
+
         trainer.persist(message.from_user.id, session)
-        await _send_long(message, safety_message(trainer.safety_resources))
-        return
-    except Exception as exc:
-        log.exception("reply failed")
-        await message.answer(
-            f"Не получилось ответить: {exc}. Попробуй отправить сообщение ещё раз."
-        )
-        return
+        # Имя перед репликой не пишем: в переписке сообщение и так от неё.
+        reply_text = reply
+        if len(reply_text) > 1024:
+            # Не влезает в подпись к фото — шлём картинку и текст отдельно.
+            await _send_face(message, trainer, session, "")
+            await _send_long(message, reply_text)
+        elif not await _send_face(message, trainer, session, reply_text):
+            await _send_long(message, reply_text)
 
-    trainer.persist(message.from_user.id, session)
-    # Имя перед репликой не пишем: в переписке сообщение и так от неё.
-    reply_text = reply
-    if len(reply_text) > 1024:
-        # Не влезает в подпись к фото — шлём картинку и текст отдельно.
-        await _send_face(message, trainer, session, "")
-        await _send_long(message, reply_text)
-    elif not await _send_face(message, trainer, session, reply_text):
-        await _send_long(message, reply_text)
+        if session.ended_by_persona:
+            # Красная линия: она закончила разговор. Разбор объяснит, на каком ходу.
+            if session.scenario.is_call:
+                farewell = "Она положила трубку. Сейчас будет разбор — почему."
+            elif session.scenario.is_correspondence:
+                farewell = "Она закрыла переписку. Сейчас будет разбор — почему."
+            else:
+                farewell = "Она ушла от разговора. Сейчас будет разбор — почему."
+            await message.answer(farewell)
 
-    if session.ended_by_persona:
-        # Красная линия: она закончила разговор. Разбор объяснит, на каком ходу.
-        if session.scenario.is_call:
-            farewell = "Она положила трубку. Сейчас будет разбор — почему."
-        elif session.scenario.is_correspondence:
-            farewell = "Она закрыла переписку. Сейчас будет разбор — почему."
-        else:
-            farewell = "Она ушла от разговора. Сейчас будет разбор — почему."
-        await message.answer(farewell)
-
-    if session.is_over:
-        # Сюжет закончился (кончились ходы или персонаж закрыл тему) — разбираем сразу.
-        await _deliver_debrief(message, trainer, message.from_user.id, session)
+        if session.is_over:
+            # Сюжет закончился (кончились ходы или персонаж закрыл тему) — разбираем сразу.
+            await _deliver_debrief(message, trainer, message.from_user.id, session)
 
 
 @router.callback_query(F.data.startswith("menu:"))

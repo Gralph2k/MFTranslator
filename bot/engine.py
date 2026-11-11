@@ -133,19 +133,27 @@ class DialogueEngine:
 
         if detect_crisis(text):
             # Упражнение останавливается: продолжать сцену в такой момент нельзя.
+            # Сообщение при этом остаётся в стенограмме — это часть записи разговора.
             raise CrisisDetected(text)
 
-        raw = await self.llm.complete(
-            persona_messages(
-                session.scenario,
-                session.state,
-                session.history,
-                session.previous,
-                turns_left=session.turns_left,
-            ),
-            json_mode=False,
-            temperature=0.85,
-        )
+        try:
+            raw = await self.llm.complete(
+                persona_messages(
+                    session.scenario,
+                    session.state,
+                    session.history,
+                    session.previous,
+                    turns_left=session.turns_left,
+                ),
+                json_mode=False,
+                temperature=0.85,
+            )
+        except Exception:
+            # Реплика не состоялась: ход не списан, сообщение убрано — повторная
+            # отправка не создаст дубль в стенограмме и не съест лимит ходов.
+            session.history.pop()
+            session.user_turns -= 1
+            raise
         reply, embedded_state, ended = _parse_persona_reply(raw)
         # Явный маркер прощания надёжнее наблюдателя: героиня сказала «пока» — сессия
         # закрывается сразу, и следующая реплика игрока уже не обрабатывается.

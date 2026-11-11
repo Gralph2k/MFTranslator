@@ -229,6 +229,26 @@ def test_heroine_does_not_schedule_the_call_herself(scenario):
     assert "Не подсказывай" in middle
 
 
+def test_drained_heroine_in_chat_does_not_offer_physical_contact(scenario):
+    """Открытая, но выдохшаяся героиня в переписке не предлагает обнять.
+
+    Ветку «открыта, но сил нет» писали для встречи, и до правки она попадала
+    в переписку без развилки по medium: героиня звала «посидеть рядом»
+    в приложении знакомств, где они вживую ещё не виделись.
+    """
+    drained = PersonaState(trust=0.7, openness=0.7, energy=0.2)
+
+    text = state_guidance(drained, scenario)
+
+    assert "обнять" not in text
+    assert "посидеть рядом" not in text
+    assert "день и время называет он" in text
+
+    # На встрече то же состояние остаётся тихим шагом к близости.
+    in_person = state_guidance(drained, load_scenario("first_date"))
+    assert "посидеть рядом" in in_person
+
+
 def test_red_flag_pressure_after_refusal_ends_the_chat(scenario):
     """Игнорирование прямого «нет» — красная линия, а не очередная ловушка."""
     prompt = persona_system_prompt(

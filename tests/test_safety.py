@@ -38,6 +38,29 @@ def test_ordinary_messages_are_not_crisis(text):
     assert detect_crisis(text) is False
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Хочу убить время до вечера",
+        "Я не хочу жить один",
+        "Не хочу жить одна в этой квартире",
+    ],
+)
+def test_everyday_idioms_are_not_crisis(text):
+    """«Убить время» и «не хочу жить один» — быт, а не угроза.
+
+    Остановка сцены с текстом про 112 на такой фразе обрывает обычный
+    разговор — против канона самого скила («лучше пропустить намёк»).
+    """
+    assert detect_crisis(text) is False
+
+
+def test_crisis_next_to_an_idiom_is_still_detected():
+    # Идиома не глушит явную угрозу в той же фразе.
+    assert detect_crisis("Хочу убить время и убить себя") is True
+    assert detect_crisis("Не хочу жить один, хочу покончить с собой") is True
+
+
 def test_detection_is_case_and_yo_insensitive():
     assert detect_crisis("МЕНЯ БЬЕТ МУЖ") is True
     assert detect_crisis("меня бьёт муж") is True
