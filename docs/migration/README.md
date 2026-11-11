@@ -55,6 +55,7 @@ safety-слой, `bot.doctor`, `launcher`, `sessions.cmd` с синхрониз�
 | [project-status.md](project-status.md) | Снимок статуса: инвентарь героинь/сценариев, что готово, git-состояние, открытые вопросы, риски. |
 | [deploy-and-testing.md](deploy-and-testing.md) | Runbook: локальная установка, проверки, деплой на VPS, бэкапы/восстановление, типовые поломки, read-only проверка прода. |
 | [claude-code-setup.md](claude-code-setup.md) | Как Claude Code читает эту конфигурацию, что перенесено из DSH, чего нет, чек-лист первого запуска. |
+| [.zcode/](../../.zcode/) | Конфигурация ZCode (добавлена 11.11.2026): `skills/writing-scenarios` (копия), `commands/` — `/test`, `/smoke`, `/deploy` под Git Bash. Правила — те же `AGENTS.md`, ZCode читает их напрямую, без импорта. |
 
 Исходные документы проекта остаются главными: [AGENTS.md](../../AGENTS.md)
 (правила), [README.md](../../README.md) (как устроено), [PROGRESS.md](../../PROGRESS.md)
@@ -168,6 +169,22 @@ safety-слой, `bot.doctor`, `launcher`, `sessions.cmd` с синхрониз�
   в боевой архив не входят, на работу бота не влияют. Правки в них деплоя не требуют.
 
 ---
+
+## Инициализация в ZCode (сделано 11.11.2026)
+
+Пакет адаптирован под ZCode: `AGENTS.md` подхватывается автоматически (без
+`CLAUDE.md`-импорта), скил и команды скопированы в `.zcode/`. Команды переведены
+с PowerShell на Git Bash (`PYTHONIOENCODING=utf-8`, `printf`-пайп, heredoc для ssh).
+Отличие от Claude Code: у ZCode нет проектного `settings.json` с правами — запреты
+на чтение `.env` и `git push` держатся только на правилах `AGENTS.md` и режиме
+разрешений сессии.
+
+Проверено 11.11.2026: `pytest -q` → **216 passed**; demo-прогоны `eva_message` и
+`first_message` → разбор, exit 0; `bot.doctor` → DeepSeek `OK`, Telegram
+`ConnectTimeout` (ожидаемо). **SSH до VPS из этой сети с 11.11 не проходит**
+(`connect to host 138.124.229.233 port 22: Connection timed out`) — read-only
+проверку прода и деплой делать только когда сеть снова пропускает (VPN); пока не
+проверено, что прод жив.
 
 ## Откат к DSH
 
