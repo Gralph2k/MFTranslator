@@ -34,11 +34,14 @@ def test_vera_has_three_scenarios_in_story_order():
     assert vera.first_scenario == "first_message"
 
 
-def test_eva_has_one_chat_scenario():
+def test_eva_has_three_scenarios_in_story_order():
     eva = next(heroine for heroine in heroines() if heroine.id == "eva")
 
-    assert eva.scenarios == ("eva_message",)
+    assert eva.scenarios == ("eva_message", "eva_call", "eva_date")
+    assert eva.first_scenario == "eva_message"
     assert load_scenario(eva.first_scenario).is_correspondence
+    assert load_scenario("eva_call").is_call
+    assert load_scenario("eva_date").shows_face
 
 
 def test_disabled_scenarios_are_out_of_rotation():
@@ -55,11 +58,15 @@ def test_story_chain_walks_through_heroines_and_wraps():
         "first_call",
         "first_date",
         "eva_message",
+        "eva_call",
+        "eva_date",
     ]
     assert next_scenario_id("first_message") == "first_call"
     assert next_scenario_id("first_call") == "first_date"
     assert next_scenario_id("first_date") == "eva_message"
-    assert next_scenario_id("eva_message") == "first_message"
+    assert next_scenario_id("eva_message") == "eva_call"
+    assert next_scenario_id("eva_call") == "eva_date"
+    assert next_scenario_id("eva_date") == "first_message"
     assert next_scenario_id("нет-такого") == "first_message"
 
 
@@ -84,6 +91,23 @@ def test_persona_is_shared_between_vera_scenarios():
         assert persona.traits == base.traits
         assert base.speech in persona.speech
     # От сцены зависит только связь героев.
+    assert len({persona.relation for persona in personas.values()}) == 3
+
+
+def test_persona_is_shared_between_eva_scenarios():
+    """Ева в переписке, на созвоне и на свидании — один человек, не три похожие."""
+    personas = {
+        scenario_id: load_scenario(scenario_id).persona
+        for scenario_id in ("eva_message", "eva_call", "eva_date")
+    }
+    base = personas["eva_message"]
+
+    for persona in personas.values():
+        assert persona.name == base.name == "Ева"
+        assert persona.age == base.age == 26
+        assert persona.job == base.job
+        assert persona.traits == base.traits
+        assert base.speech in persona.speech
     assert len({persona.relation for persona in personas.values()}) == 3
 
 

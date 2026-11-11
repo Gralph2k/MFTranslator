@@ -43,11 +43,14 @@ class DemoLLM:
         temperature: float = 0.8,
     ) -> str:
         self.calls.append({"messages": messages, "json_mode": json_mode})
-        system = messages[0]["content"] if messages else ""
-        if "методист" in system:
+        # Маршрутизируем по началу системного промпта, а не по подстроке:
+        # в трейтах Евы есть «наблюдательности», и реплика персонажа
+        # не должна превращаться в JSON наблюдателя.
+        system = messages[0]["content"].lstrip() if messages else ""
+        if system.startswith("Ты — методист"):
             ids = _RUBRIC_ID.findall(system)
             return _demo_debrief(ids) if ids else self.debrief
-        if "наблюдатель" in system:
+        if system.startswith("Ты — наблюдатель"):
             return json.dumps(
                 {
                     "mood": "устала, но тянет к нему",
@@ -183,7 +186,7 @@ async def run(provider: str, scenario_name: str) -> int:
     print(backstory_text(scenario))
     if scenario.is_call:
         print()
-        print("[экран звонка: исходящий вызов — Вера, мобильный]")
+        print(f"[экран звонка: исходящий вызов — {scenario.persona.name}, мобильный]")
     if scenario.is_correspondence:
         print()
         print("Анкета в приложении знакомств:")

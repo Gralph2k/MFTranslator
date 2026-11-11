@@ -400,3 +400,20 @@ async def test_demo_llm_tells_dialogue_from_debrief(scenario):
         debrief_messages(scenario, [{"role": "user", "content": "Привет"}]), json_mode=True
     )
     assert json.loads(debrief_raw)["scores"]["noticing"] == 2
+
+
+async def test_demo_llm_routes_by_role_not_by_substring():
+    """В трейтах Евы есть «наблюдательности»: персонаж не должен из-за этого
+    превращаться в JSON наблюдателя — маршрут демо ищет по началу промпта роли."""
+    from bot.cli import DemoLLM, _demo_debrief
+    from bot.prompts import persona_messages
+    from bot.scenario import load_scenario
+
+    eva = load_scenario("eva_message")
+    state = PersonaState.from_mapping(eva.initial_state)
+    system = persona_messages(eva, state, [])[0]["content"]
+    assert "наблюдательности" in system, "трейт Евы должен попадать в промпт"
+
+    llm = DemoLLM(["живая реплика"], _demo_debrief())
+    reply = await llm.complete(persona_messages(eva, state, []))
+    assert reply == "живая реплика"

@@ -38,8 +38,13 @@ def test_heroine_menu_lists_scenarios_in_story_order():
     ]
 
 
-def test_eva_has_a_single_chat_scenario():
-    assert _callbacks(heroine_menu("eva")) == ["menu:start:eva_message", "menu:list"]
+def test_eva_menu_lists_scenarios_in_story_order():
+    assert _callbacks(heroine_menu("eva")) == [
+        "menu:start:eva_message",
+        "menu:start:eva_call",
+        "menu:start:eva_date",
+        "menu:list",
+    ]
 
 
 def test_disabled_scenarios_are_not_in_any_menu():
@@ -70,8 +75,16 @@ def test_after_date_moves_to_the_next_heroine():
     assert any("Продолжить: Ева" in text for text in _texts(markup))
 
 
-def test_after_eva_returns_to_vera():
-    assert _callbacks(after_finish_menu("eva_message"))[0] == "menu:start:first_message"
+def test_after_eva_message_continues_eva_chain():
+    markup = after_finish_menu("eva_message")
+    callbacks = _callbacks(markup)
+
+    assert callbacks[0] == "menu:start:eva_call"
+    assert any("Продолжить: Ева" in text for text in _texts(markup))
+
+
+def test_after_eva_date_returns_to_vera():
+    assert _callbacks(after_finish_menu("eva_date"))[0] == "menu:start:first_message"
 
 
 def test_pick_button_opens_the_heroine_list():
