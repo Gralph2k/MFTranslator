@@ -170,9 +170,13 @@ scenarios/eva_message/images/profile_1.jpg
 Набор — десять кадров: `calm`, `tired`, `irritated`, `hurt`, `closed`, `guarded`,
 `warming`, `smiling`, `laughing`, `tears`. Промпты для генерации:
 [prompts/anya-nano-banana.md](prompts/anya-nano-banana.md),
-[prompts/vera-nano-banana.md](prompts/vera-nano-banana.md),
-[prompts/vera-profile-nano-banana.md](prompts/vera-profile-nano-banana.md),
-[prompts/eva-profile-nano-banana.md](prompts/eva-profile-nano-banana.md).
+[prompts/eva-profile-nano-banana.md](prompts/eva-profile-nano-banana.md),
+[prompts/vera-photoreal-nano-banana.md](prompts/vera-photoreal-nano-banana.md) —
+актуальный набор Веры: эталон, 3 кадра анкеты, 10 эмоций и фото для экрана звонка,
+всё в фотореализме. Старые аниме-промпты Веры
+([vera-nano-banana.md](prompts/vera-nano-banana.md),
+[vera-profile-nano-banana.md](prompts/vera-profile-nano-banana.md)) оставлены как
+история прежнего набора.
 
 У Евы фотореалистичная анкета из четырёх кадров; кадров эмоций у неё нет — в
 переписке лицо не показывается. Пока фото нет, бот присылает текстовую карточку.
