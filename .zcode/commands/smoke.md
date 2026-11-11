@@ -1,14 +1,14 @@
 ---
 description: Demo-прогон сценария без сети и ключей — проверяет загрузку, реплики и разбор по рубрике
-argument-hint: <scenario-id>, например eva_message (по умолчанию first_message)
+argument-hint: <scenario-id>, например first_message/eva (по умолчанию first_message/vera)
 ---
 
 Проверь сценарий в demo-режиме: без сети, без Telegram, без ключей из `.env`.
 
-1. Определи сценарий: `$ARGUMENTS` или `first_message`, если пусто. id должен
-   существовать: `scenarios/<id>/scenario.json`. Доступные id:
-   `first_message`, `first_call`, `first_date`, `eva_message`
-   (`friday_evening` и `reunion_call` выключены — `enabled: false`, их прогонять
+1. Определи сценарий: `$ARGUMENTS` или `first_message/vera`, если пусто. id должен
+   существовать: `scenarios/<сцена>/<героиня>/scenario.json`. Доступные id:
+   `first_message/vera`, `first_call/vera`, `first_date/vera`, `first_message/eva`
+   (`friday_evening/anya` и `reunion_call/ira` выключены — `enabled: false`, их прогонять
    только по прямой просьбе).
 
 2. Прогони неинтерактивно (stdin закрывается — CLI сам напечатает разбор):

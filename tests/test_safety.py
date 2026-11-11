@@ -8,7 +8,7 @@ from bot.scenario import load_scenario
 
 @pytest.fixture
 def scenario():
-    return load_scenario("friday_evening")
+    return load_scenario("friday_evening/anya")
 
 
 @pytest.mark.parametrize(

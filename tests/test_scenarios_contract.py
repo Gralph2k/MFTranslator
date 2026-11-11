@@ -6,7 +6,7 @@ import pytest
 
 from bot.faces import EMOTIONS
 from bot.heroines import load_heroine
-from bot.scenario import all_scenarios, load_scenario
+from bot.scenario import SCENARIO_DIR, SCENARIO_ID_ALIASES, all_scenarios, load_scenario
 
 
 @pytest.mark.parametrize("name", all_scenarios())
@@ -38,6 +38,9 @@ def test_scenario_meets_contract(name):
     # Сценарий — папка: рядом со scenario.json лежит images/ с фотографиями.
     assert scenario.dir.is_dir(), "нет папки сценария"
     assert scenario.faces_dir.is_dir(), "нет папки для фотографий"
+    # id — путь под scenarios/: папка и id не разъезжаются.
+    assert scenario.id == scenario.dir.relative_to(SCENARIO_DIR).as_posix()
+    assert scenario.id not in SCENARIO_ID_ALIASES, "id должен быть новым, а не алиасом"
 
     # По скилу ловушка пишется как «ход — почему кажется разумным и что ломает».
     for hurt in scenario.hurts:

@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .scenario import SCENARIO_ID_ALIASES
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,6 +118,15 @@ class Storage:
             self._conn.execute(
                 "ALTER TABLE sessions ADD COLUMN ended_by_persona "
                 "INTEGER NOT NULL DEFAULT 0"
+            )
+        # Сценарии переехали в `scenarios/<сцена>/<героиня>/`, id стал путём.
+        # Переименовываем старые плоские id прямо в БД, иначе потеряются
+        # продолжения (continues) и списки сессий. Идемпотентно: после
+        # первого прогона старых id не остаётся.
+        for old_id, new_id in SCENARIO_ID_ALIASES.items():
+            self._conn.execute(
+                "UPDATE sessions SET scenario_id = ? WHERE scenario_id = ?",
+                (new_id, old_id),
             )
 
     def close(self) -> None:

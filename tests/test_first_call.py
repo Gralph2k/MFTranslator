@@ -21,7 +21,7 @@ from bot.state import PersonaState
 
 @pytest.fixture
 def scenario():
-    return load_scenario("first_call")
+    return load_scenario("first_call/vera")
 
 
 def test_call_has_no_face_and_continues_the_chat(scenario):
@@ -30,7 +30,7 @@ def test_call_has_no_face_and_continues_the_chat(scenario):
     assert not scenario.shows_face
     assert not scenario.is_correspondence
     assert scenario.profile is None
-    assert scenario.continues == "first_message"
+    assert scenario.continues == "first_message/vera"
     assert scenario.canon_history
     assert scenario.opening.startswith("Алло")
     assert scenario.turn_limit == 10

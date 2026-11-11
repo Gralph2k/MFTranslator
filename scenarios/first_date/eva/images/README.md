@@ -1,22 +1,22 @@
 # Фотографии Евы на первом свидании
 
-Папка сценария `eva_date` — первая встреча вживую: винный бар с живым трио,
+Папка сценария `first_date/eva` — первая встреча вживую: винный бар с живым трио,
 четверг, вечер. В отличие от переписки и созвона, здесь игрок видит лицо —
 бот подставляет кадр настроения (`bot/faces.py`) к репликам Евы.
 
 ## Куда положить кадры
 
 ```
-scenarios/eva_date/images/calm.jpg       — спокойно
-scenarios/eva_date/images/guarded.jpg    — насторожена (главная эмоция сцены)
-scenarios/eva_date/images/closed.jpg     — закрылась
-scenarios/eva_date/images/irritated.jpg  — раздражена
-scenarios/eva_date/images/hurt.jpg       — обижена
-scenarios/eva_date/images/warming.jpg    — теплеет
-scenarios/eva_date/images/smiling.jpg    — улыбается
-scenarios/eva_date/images/laughing.jpg   — смеётся
-scenarios/eva_date/images/tired.jpg      — устала
-scenarios/eva_date/images/tears.jpg      — на глазах слёзы
+scenarios/first_date/eva/images/calm.jpg       — спокойно
+scenarios/first_date/eva/images/guarded.jpg    — насторожена (главная эмоция сцены)
+scenarios/first_date/eva/images/closed.jpg     — закрылась
+scenarios/first_date/eva/images/irritated.jpg  — раздражена
+scenarios/first_date/eva/images/hurt.jpg       — обижена
+scenarios/first_date/eva/images/warming.jpg    — теплеет
+scenarios/first_date/eva/images/smiling.jpg    — улыбается
+scenarios/first_date/eva/images/laughing.jpg   — смеётся
+scenarios/first_date/eva/images/tired.jpg      — устала
+scenarios/first_date/eva/images/tears.jpg      — на глазах слёзы
 ```
 
 Промпты, замороженная внешность (веснушки, зелёно-карие глаза, светлый блонд

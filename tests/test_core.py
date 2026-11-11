@@ -18,14 +18,14 @@ from bot.state import PersonaState
 
 @pytest.fixture
 def scenario():
-    return load_scenario("friday_evening")
+    return load_scenario("friday_evening/anya")
 
 
 def test_scenario_loads_and_is_complete(scenario):
-    assert scenario.id == "friday_evening"
+    assert scenario.id == "friday_evening/anya"
     # Сценарий «на будущее» выключен из ротации, но по-прежнему валиден.
-    assert "friday_evening" not in available_scenarios()
-    assert "friday_evening" in all_scenarios()
+    assert "friday_evening/anya" not in available_scenarios()
+    assert "friday_evening/anya" in all_scenarios()
     assert scenario.enabled is False
     assert len(scenario.rubric) == 6
     assert scenario.max_score == 12
@@ -43,13 +43,13 @@ def test_scenario_loads_by_id_folder_or_file():
     """Сценарий — папка, но старый способ «по id» должен работать."""
     from bot.scenario import SCENARIO_DIR
 
-    by_id = load_scenario("first_date")
-    by_folder = load_scenario(SCENARIO_DIR / "first_date")
-    by_file = load_scenario(SCENARIO_DIR / "first_date" / "scenario.json")
+    by_id = load_scenario("first_date/vera")
+    by_folder = load_scenario(SCENARIO_DIR / "first_date/vera")
+    by_file = load_scenario(SCENARIO_DIR / "first_date/vera" / "scenario.json")
 
-    assert by_id.id == by_folder.id == by_file.id == "first_date"
-    assert by_folder.dir == by_file.dir == SCENARIO_DIR / "first_date"
-    assert by_id.faces_dir == SCENARIO_DIR / "first_date" / "images"
+    assert by_id.id == by_folder.id == by_file.id == "first_date/vera"
+    assert by_folder.dir == by_file.dir == SCENARIO_DIR / "first_date/vera"
+    assert by_id.faces_dir == SCENARIO_DIR / "first_date/vera" / "images"
 
 
 def test_backstory_is_separate_from_rules(scenario):
@@ -119,7 +119,7 @@ def test_state_guidance_changes_contact_initiative():
 
 def test_contact_step_comes_from_scenario():
     """Шаг к нему — свойство сцены: дома объятие, на свидании продолжение."""
-    date = load_scenario("first_date")
+    date = load_scenario("first_date/vera")
     open_ = PersonaState(trust=0.8, openness=0.9, energy=0.7)
 
     assert date.contact_hint in state_guidance(open_, date)
@@ -138,7 +138,7 @@ def test_frame_replaces_the_couple_only_intro(scenario):
 
 def test_rules_have_no_first_move_hint():
     """Подсказку на первый ход убрали: игрок должен сам заметить материал."""
-    date = load_scenario("first_date")
+    date = load_scenario("first_date/vera")
     rules = rules_text(date)
 
     assert "Подсказка" not in rules
@@ -409,7 +409,7 @@ async def test_demo_llm_routes_by_role_not_by_substring():
     from bot.prompts import persona_messages
     from bot.scenario import load_scenario
 
-    eva = load_scenario("eva_message")
+    eva = load_scenario("first_message/eva")
     state = PersonaState.from_mapping(eva.initial_state)
     system = persona_messages(eva, state, [])[0]["content"]
     assert "наблюдательности" in system, "трейт Евы должен попадать в промпт"

@@ -68,15 +68,15 @@ def test_restart_closes_previous_session(store):
 
 def test_scenario_can_be_chosen(store):
     trainer = _trainer(store)
-    session = trainer.start_session(telegram_id=5, scenario_id="reunion_call")
+    session = trainer.start_session(telegram_id=5, scenario_id="reunion_call/ira")
 
-    assert session.scenario.id == "reunion_call"
+    assert session.scenario.id == "reunion_call/ira"
     assert session.history[0]["content"] == session.scenario.opening
 
     # После перезапуска сценарий поднимается из базы, а не из памяти.
     restored = _trainer(store).get_session(5)
     assert restored is not None
-    assert restored.scenario.id == "reunion_call"
+    assert restored.scenario.id == "reunion_call/ira"
 
 
 def test_unknown_scenario_is_rejected(store):
@@ -131,14 +131,14 @@ async def test_start_opens_a_random_heroine(store, monkeypatch):
 
     session = trainer.get_session(1)
     assert session is not None
-    assert session.scenario.id == "first_message"
+    assert session.scenario.id == "first_message/vera"
     assert any("тренажёр" in text.lower() for text in message.sent)
 
 
 async def test_start_anti_repeats_the_last_heroine(store, monkeypatch):
     """Если прошлый разговор был с Верой, случайный выбор её исключает."""
     trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
-    trainer.start_session(telegram_id=1, scenario_id="first_message")
+    trainer.start_session(telegram_id=1, scenario_id="first_message/vera")
 
     seen: dict[str, str | None] = {}
 
@@ -154,13 +154,13 @@ async def test_start_anti_repeats_the_last_heroine(store, monkeypatch):
     assert seen["last"] == "vera"
     session = trainer.get_session(1)
     assert session is not None
-    assert session.scenario.id == "eva_message"
+    assert session.scenario.id == "first_message/eva"
 
 
 async def test_restart_does_not_relaunch_a_disabled_scenario(store, monkeypatch):
     """Активную выключенную сцену /restart меняет на случайную героиню."""
     trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
-    trainer.start_session(telegram_id=1, scenario_id="friday_evening")
+    trainer.start_session(telegram_id=1, scenario_id="friday_evening/anya")
 
     monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
     monkeypatch.setattr(
@@ -171,7 +171,7 @@ async def test_restart_does_not_relaunch_a_disabled_scenario(store, monkeypatch)
 
     session = trainer.get_session(1)
     assert session is not None
-    assert session.scenario.id == "eva_message"
+    assert session.scenario.id == "first_message/eva"
 
 
 async def test_debrief_arrives_as_soon_as_turns_run_out(store, monkeypatch):

@@ -42,8 +42,8 @@ def test_view_combines_local_and_live_sessions(folder):
     remote = folder / "remote.db"
     view = folder / "view.db"
 
-    _seed(local, 111, "friday_evening", "Итог: 8 из 12")
-    _seed(remote, 111, "first_call", "Итог: 5 из 12")
+    _seed(local, 111, "friday_evening/anya", "Итог: 8 из 12")
+    _seed(remote, 111, "first_call/vera", "Итог: 5 из 12")
 
     build_view_db(local, remote, view)
 
@@ -51,11 +51,11 @@ def test_view_combines_local_and_live_sessions(folder):
     try:
         rows = {row.scenario: row for row in store.list_overview()}
         assert store.count_sessions() == 2
-        assert set(rows) == {"friday_evening", "first_call"}
-        assert "8 из 12" in (rows["friday_evening"].debrief or "")
-        assert "5 из 12" in (rows["first_call"].debrief or "")
+        assert set(rows) == {"friday_evening/anya", "first_call/vera"}
+        assert "8 из 12" in (rows["friday_evening/anya"].debrief or "")
+        assert "5 из 12" in (rows["first_call/vera"].debrief or "")
         # Новые сессии с VPS идут после локальных: список не перетасовывается.
-        assert rows["first_call"].id > rows["friday_evening"].id
+        assert rows["first_call/vera"].id > rows["friday_evening/anya"].id
     finally:
         store.close()
 
@@ -65,8 +65,8 @@ def test_merge_is_idempotent(folder):
     remote = folder / "remote.db"
     view = folder / "view.db"
 
-    _seed(local, 111, "friday_evening")
-    _seed(remote, 111, "first_call")
+    _seed(local, 111, "friday_evening/anya")
+    _seed(remote, 111, "first_call/vera")
 
     build_view_db(local, remote, view)
     merge_databases(view, remote)
@@ -90,14 +90,14 @@ def test_remote_users_are_matched_by_telegram_id(folder):
         local_user = store.ensure_user(111)
     finally:
         store.close()
-    _seed(remote, 111, "first_call")
+    _seed(remote, 111, "first_call/vera")
 
     build_view_db(local, remote, view)
 
     store = Storage(view)
     try:
         assert store.ensure_user(111) == local_user
-        sessions = [row for row in store.list_overview() if row.scenario == "first_call"]
+        sessions = [row for row in store.list_overview() if row.scenario == "first_call/vera"]
         assert len(sessions) == 1
         assert sessions[0].user_id == local_user
     finally:
@@ -107,13 +107,13 @@ def test_remote_users_are_matched_by_telegram_id(folder):
 def test_view_without_remote_is_a_copy_of_local(folder):
     local = folder / "local.db"
     view = folder / "view.db"
-    _seed(local, 111, "friday_evening", "Итог: 8 из 12")
+    _seed(local, 111, "friday_evening/anya", "Итог: 8 из 12")
 
     build_view_db(local, None, view)
 
     store = Storage(view)
     try:
         assert store.count_sessions() == 1
-        assert store.list_overview()[0].scenario == "friday_evening"
+        assert store.list_overview()[0].scenario == "friday_evening/anya"
     finally:
         store.close()

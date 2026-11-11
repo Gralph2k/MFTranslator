@@ -1,16 +1,16 @@
 # Референсы героинь
 
 Здесь лежат утверждённые эталонные портреты, по которым генерируются фотореалистичные
-наборы. Бот эту папку не читает: кадры для сцен лежат в `scenarios/<id>/images/`.
+наборы. Бот эту папку не читает: кадры для сцен лежат в `scenarios/<сцена>/<героиня>/images/`.
 Держать эталоны вне `scenarios/` важно — иначе `bot/faces.py` может принять их за кадр
 настроения.
 
 - `vera-cafe-base.jpg` — эталон Веры: фотореалистичный портрет в летнем кафе.
   Создаётся первым по [`prompts/vera-photoreal-nano-banana.md`](../vera-photoreal-nano-banana.md),
-  шаг 1. От него делаются десять эмоций (`scenarios/first_date/images/`), три кадра
-  анкеты (`scenarios/first_message/images/`) и `call.jpg` (`scenarios/first_call/images/`).
+  шаг 1. От него делаются десять эмоций (`scenarios/first_date/vera/images/`), три кадра
+  анкеты (`scenarios/first_message/vera/images/`) и `call.jpg` (`scenarios/first_call/vera/images/`).
 - `eva-base.jpg` — если эталон Евы лежит здесь; её четыре кадра анкеты идут
-  в `scenarios/eva_message/images/profile_1..4.jpg`.
+  в `scenarios/first_message/eva/images/profile_1..4.jpg`.
 
 Эталон — единственный кадр, где лицо создаётся с нуля. Все остальные генерируются
 с ним как референсом: так одна и та же героиня не «плывёт» между сценами.

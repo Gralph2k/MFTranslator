@@ -1,6 +1,6 @@
 # Фотографии Евы в переписке
 
-Папка сценария `eva_message` — переписка в приложении знакомств до первой
+Папка сценария `first_message/eva` — переписка в приложении знакомств до первой
 встречи. Ева, 26, фрилансер-фотограф: работает на себя, ездит на мотоцикле,
 путешествует, ходит по ресторанам. Стиль — фотореализм, в отличие от
 аниме-серии Веры и Ани; наборы героинь не смешиваются.
@@ -12,10 +12,10 @@
 ## Куда положить кадры
 
 ```
-scenarios/eva_message/images/profile_1.jpg   — работа и «о себе»: крыша, камера в руках
-scenarios/eva_message/images/profile_2.jpg   — мотоцикл, трасса, закат, шлем в руке
-scenarios/eva_message/images/profile_3.jpg   — горная дорога, рюкзак, ветер
-scenarios/eva_message/images/profile_4.jpg   — ресторан, тёплый вечер, бокал
+scenarios/first_message/eva/images/profile_1.jpg   — работа и «о себе»: крыша, камера в руках
+scenarios/first_message/eva/images/profile_2.jpg   — мотоцикл, трасса, закат, шлем в руке
+scenarios/first_message/eva/images/profile_3.jpg   — горная дорога, рюкзак, ветер
+scenarios/first_message/eva/images/profile_4.jpg   — ресторан, тёплый вечер, бокал
 ```
 
 Промпты, замороженная внешность (веснушки, зелёно-карие глаза, светлый блонд в низком

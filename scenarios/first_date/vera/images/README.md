@@ -17,4 +17,4 @@ tired.jpg       tears.jpg
 `scenario.json` лежит `images/`, и `bot/faces.py` берёт картинку оттуда.
 
 Для сценария про вечер выпускников пока используются фотографии Ани — они лежат
-в `scenarios/reunion_call/images/`.
+в `scenarios/reunion_call/ira/images/`.

@@ -221,7 +221,7 @@ sudo systemctl status emotion-trainer --no-pager
 sudo journalctl -u emotion-trainer -n 50 --no-pager
 ```
 
-В Telegram: `/start` → должен прийти первый сценарий (переписка), `/scenario first_call`
+В Telegram: `/start` → должен прийти первый сценарий (переписка), `/scenario first_call/vera`
 → экран звонка и «Алло. О. Ты правда позвонил.». Если это работает — деплой готов.
 
 ## 7. Обновления

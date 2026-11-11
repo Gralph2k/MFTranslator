@@ -8,7 +8,7 @@ from bot.scenario import load_scenario
 
 
 def _scenario():
-    return load_scenario("eva_call")
+    return load_scenario("first_call/eva")
 
 
 def test_call_continues_eva_chat():
@@ -17,7 +17,7 @@ def test_call_continues_eva_chat():
     assert scenario.is_call
     assert scenario.shows_face is False
     assert scenario.profile is None
-    assert scenario.continues == "eva_message"
+    assert scenario.continues == "first_message/eva"
     assert scenario.heroine == "eva"
     assert scenario.enabled is True
     assert (scenario.faces_dir / "call.jpg").is_file()

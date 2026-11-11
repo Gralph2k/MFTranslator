@@ -19,8 +19,8 @@ def _text(scenario) -> str:
     ).lower()
 
 
-def test_friday_evening_is_about_work_not_reunion():
-    scenario = load_scenario("friday_evening")
+def test_anya_scene_is_about_work_not_reunion():
+    scenario = load_scenario("friday_evening/anya")
     text = _text(scenario)
 
     assert "клава" not in text
@@ -29,8 +29,8 @@ def test_friday_evening_is_about_work_not_reunion():
     assert "руководител" in text
 
 
-def test_reunion_call_is_about_the_call_not_the_office():
-    scenario = load_scenario("reunion_call")
+def test_ira_scene_is_about_the_call_not_the_office():
+    scenario = load_scenario("reunion_call/ira")
     text = _text(scenario)
 
     assert "клава" in text
@@ -38,8 +38,8 @@ def test_reunion_call_is_about_the_call_not_the_office():
     assert "защит" not in text
 
 
-def test_first_date_is_about_a_first_meeting_not_a_long_relationship():
-    scenario = load_scenario("first_date")
+def test_vera_date_is_about_a_first_meeting_not_a_long_relationship():
+    scenario = load_scenario("first_date/vera")
     text = _text(scenario)
 
     assert "приложени" in text
@@ -48,9 +48,9 @@ def test_first_date_is_about_a_first_meeting_not_a_long_relationship():
     assert "одноклассниц" not in text
 
 
-def test_first_message_is_about_the_app_chat_not_the_meeting():
+def test_vera_chat_is_about_the_app_chat_not_the_meeting():
     """Переписка до свидания: та же Вера, но ещё ни разу не виделись вживую."""
-    scenario = load_scenario("first_message")
+    scenario = load_scenario("first_message/vera")
     text = _text(scenario)
 
     assert "приложени" in text
@@ -62,9 +62,9 @@ def test_first_message_is_about_the_app_chat_not_the_meeting():
     assert "кофейн" not in text
 
 
-def test_first_call_is_about_the_phone_call_not_the_meeting():
+def test_vera_call_is_about_the_phone_call_not_the_meeting():
     """Созвон после переписки: уже не переписка, но ещё не свидание."""
-    scenario = load_scenario("first_call")
+    scenario = load_scenario("first_call/vera")
     text = _text(scenario)
 
     assert "созвон" in text or "телефон" in text
@@ -75,9 +75,9 @@ def test_first_call_is_about_the_phone_call_not_the_meeting():
     assert "кофейне" not in text
 
 
-def test_eva_message_is_about_her_life_not_vera():
+def test_eva_chat_is_about_her_life_not_vera():
     """Ева — отдельная героиня: фотографии, мотоцикл, поездки; без сюжета Веры."""
-    scenario = load_scenario("eva_message")
+    scenario = load_scenario("first_message/eva")
     text = _text(scenario)
 
     assert "съёмк" in text or "фотограф" in text

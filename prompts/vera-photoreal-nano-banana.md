@@ -14,9 +14,9 @@
 | набор | куда | файлы | сколько |
 |---|---|---|---|
 | эталон | вне `scenarios/` | `prompts/reference/vera-cafe-base.jpg` | 1 (из 3–4 попыток) |
-| анкета | `scenarios/first_message/images/` | `profile_1..3.jpg` | 3 |
-| эмоции | `scenarios/first_date/images/` | `calm` … `tears` | 10 |
-| звонок | `scenarios/first_call/images/` | `call.jpg` | 1 |
+| анкета | `scenarios/first_message/vera/images/` | `profile_1..3.jpg` | 3 |
+| эмоции | `scenarios/first_date/vera/images/` | `calm` … `tears` | 10 |
+| звонок | `scenarios/first_call/vera/images/` | `call.jpg` | 1 |
 
 Итого 14 кадров для бота. Старые аниме-файлы заменяются файлами с теми же именами —
 код и сценарии менять не нужно.
@@ -117,7 +117,7 @@ watermark, no logo, no other people, no jewelry, no glasses.
 - кадр годится как эталон: лицо крупно, макушка и плечи не обрезаны;
 - в кадре нет текста, чужих людей и рекламного глянца.
 
-## Шаг 2. Десять эмоций — `scenarios/first_date/images/`
+## Шаг 2. Десять эмоций — `scenarios/first_date/vera/images/`
 
 ### Общий шаблон: меняется только выражение
 
@@ -166,7 +166,7 @@ natural light, same muted warm grading. 1:1 square, 1024×1024.
 и поджала губы, кадр переснять: злость — это `irritated`, и она для набора нужна
 отдельно.
 
-## Шаг 3. Три кадра анкеты — `scenarios/first_message/images/`
+## Шаг 3. Три кадра анкеты — `scenarios/first_message/vera/images/`
 
 ### 1. Главное фото, город — `profile_1.jpg`
 
@@ -329,7 +329,7 @@ foreground, no raised glasses, no cigarettes, no party clichés. No other person
 микрофон и не закрывает лицо; на экране нет читаемых букв; подруги размыты и вторичны;
 неон не убил тёплый тон кожи; кроп удачный.
 
-## Шаг 4. Фото для экрана звонка — `scenarios/first_call/images/call.jpg`
+## Шаг 4. Фото для экрана звонка — `scenarios/first_call/vera/images/call.jpg`
 
 Назначение: единственная картинка сцены-созвона. По сюжету четверг, вечер, она дома
 и ждёт звонка. Интерфейс звонка (имя, «мобильный», «Вызов…») рисует код — модель его
@@ -416,22 +416,22 @@ no watermark, no logo, no phone in her hands, no other people.
 ```
 prompts/reference/vera-cafe-base.jpg          эталон, бот его не читает
 
-scenarios/first_message/images/profile_1.jpg  анкета: город, работа и «о себе»
-scenarios/first_message/images/profile_2.jpg  анкета: сальса
-scenarios/first_message/images/profile_3.jpg  анкета: караоке
+scenarios/first_message/vera/images/profile_1.jpg  анкета: город, работа и «о себе»
+scenarios/first_message/vera/images/profile_2.jpg  анкета: сальса
+scenarios/first_message/vera/images/profile_3.jpg  анкета: караоке
 
-scenarios/first_date/images/calm.jpg          эмоции для сцены вживую
-scenarios/first_date/images/guarded.jpg
-scenarios/first_date/images/closed.jpg
-scenarios/first_date/images/irritated.jpg
-scenarios/first_date/images/hurt.jpg
-scenarios/first_date/images/warming.jpg
-scenarios/first_date/images/smiling.jpg
-scenarios/first_date/images/laughing.jpg
-scenarios/first_date/images/tired.jpg
-scenarios/first_date/images/tears.jpg
+scenarios/first_date/vera/images/calm.jpg          эмоции для сцены вживую
+scenarios/first_date/vera/images/guarded.jpg
+scenarios/first_date/vera/images/closed.jpg
+scenarios/first_date/vera/images/irritated.jpg
+scenarios/first_date/vera/images/hurt.jpg
+scenarios/first_date/vera/images/warming.jpg
+scenarios/first_date/vera/images/smiling.jpg
+scenarios/first_date/vera/images/laughing.jpg
+scenarios/first_date/vera/images/tired.jpg
+scenarios/first_date/vera/images/tears.jpg
 
-scenarios/first_call/images/call.jpg           фото для экрана звонка
+scenarios/first_call/vera/images/call.jpg           фото для экрана звонка
 ```
 
 Старые файлы с этими именами заменяются новыми — код не меняется. Кеш карточек анкеты

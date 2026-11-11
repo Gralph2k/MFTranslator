@@ -8,7 +8,7 @@ from bot.state import PersonaState
 
 
 def _scenario():
-    return load_scenario("eva_message")
+    return load_scenario("first_message/eva")
 
 
 def test_eva_is_a_chat_heroine():

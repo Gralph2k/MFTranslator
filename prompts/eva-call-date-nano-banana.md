@@ -1,12 +1,12 @@
 # Промпты для Nano Banana: экран звонка и серия эмоций Евы
 
 Модель: **Gemini 2.5 Flash Image** («Nano Banana»). Два набора для продолжения
-истории Евы после переписки (`eva_message`):
+истории Евы после переписки (`first_message/eva`):
 
 | набор | сценарий | файлов |
 |---|---|---|
-| контактное фото звонка | `eva_call` | 1 (`call.jpg`) |
-| серия эмоций на свидании | `eva_date` | 10 (`calm`, `guarded`, `closed`, `irritated`, `hurt`, `warming`, `smiling`, `laughing`, `tired`, `tears`) |
+| контактное фото звонка | `first_call/eva` | 1 (`call.jpg`) |
+| серия эмоций на свидании | `first_date/eva` | 10 (`calm`, `guarded`, `closed`, `irritated`, `hurt`, `warming`, `smiling`, `laughing`, `tired`, `tears`) |
 
 **Стиль — фотореализм**, как во всей серии Евы. Не смешивать с референсами
 Веры и Ани (аниме): модель подтянет чужой стиль, и лицо «уплывёт».
@@ -15,7 +15,7 @@
 
 Один человек, а не похожие девушки. Якоря идентичности — из серии анкеты
 (`prompts/eva-profile-nano-banana.md`): сверять с
-`scenarios/eva_message/images/profile_1.jpg`.
+`scenarios/first_message/eva/images/profile_1.jpg`.
 
 | | Ева (не менять) |
 |---|---|
@@ -41,7 +41,7 @@
    в эталоне.
 4. Не прикреплять кадры Веры и Ани. Не собирать серию «с нуля» без референса.
 
-## Кадр для экрана звонка — `eva_call/images/call.jpg`
+## Кадр для экрана звонка — `first_call/eva/images/call.jpg`
 
 Назначение: единственная картинка созвона. `bot/call_screen.py` рисует поверх
 затемнение сверху и снизу, «ИСХОДЯЩИЙ ВЫЗОВ», имя, «мобильный», «Вызов…» и
@@ -80,7 +80,7 @@ no logo, no hat, no sunglasses.
 половине кадра (уйдёт под затемнение имени); без кокетства и «взгляда из-под
 ресниц» — она смотрит на экран, спокойно и прямо.
 
-## Серия эмоций — `eva_date/images/`
+## Серия эмоций — `first_date/eva/images/`
 
 ### Эталон сцены — `calm.jpg`
 
@@ -259,8 +259,8 @@ Restrained — no sobbing, no exaggerated drama.
 ## Имена файлов и связка с ботом
 
 ```
-scenarios/eva_call/images/call.jpg        — экран звонка (bot/call_screen.py)
-scenarios/eva_date/images/calm.jpg        — и ещё 9 кадров эмоций
+scenarios/first_call/eva/images/call.jpg        — экран звонка (bot/call_screen.py)
+scenarios/first_date/eva/images/calm.jpg        — и ещё 9 кадров эмоций
 ```
 
 Бот сам подставляет кадры: экран звонка — перед первой репликой созвона,

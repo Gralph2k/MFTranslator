@@ -12,10 +12,11 @@ from typing import Any
 
 from .config import Settings, load_settings
 from .engine import DialogueEngine
+from .heroines import story_scenarios
 from .llm import DeepSeekLLM, LLM
 from .prompts import backstory_text, profile_text, rules_text
 from .safety import CrisisDetected, safety_message
-from .scenario import available_scenarios, load_scenario
+from .scenario import load_scenario
 
 # Строка рубрики в промпте методиста: «- noticing («Заметил состояние», 0..2): ...».
 # По ней демо-режим собирает баллы под тот сценарий, который играют, а не под один зашитый.
@@ -258,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description="Локальный прогон сценария")
     parser.add_argument("--provider", choices=["demo", "deepseek"], default="demo")
-    parser.add_argument("--scenario", default=available_scenarios()[0])
+    parser.add_argument("--scenario", default=story_scenarios()[0])
     args = parser.parse_args(argv)
     return asyncio.run(run(args.provider, args.scenario))
 

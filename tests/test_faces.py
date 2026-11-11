@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from bot.faces import EMOTIONS, emotion_for_state, face_path, label
-from bot.scenario import available_scenarios, load_scenario
+from bot.scenario import SCENARIO_DIR, available_scenarios, load_scenario
 from bot.state import PersonaState
 
 # %TEMP% в этой среде закрыт песочницей, поэтому фикстуру tmp_path не используем.
@@ -49,11 +49,11 @@ def test_faces_live_next_to_the_scenario():
     """Фотографии — часть сценария, а не общая папка на всех."""
     for name in available_scenarios():
         scenario = load_scenario(name)
-        assert scenario.dir.name == name
+        assert scenario.dir == SCENARIO_DIR / name
         assert scenario.faces_dir == scenario.dir / "images"
 
 
-@pytest.mark.parametrize("name", ["first_date", "friday_evening", "reunion_call"])
+@pytest.mark.parametrize("name", ["first_date/vera", "friday_evening/anya", "reunion_call/ira"])
 def test_every_emotion_has_a_picture(name):
     """У каждого сценария есть файл на каждую эмоцию."""
     scenario = load_scenario(name)
@@ -72,7 +72,7 @@ def test_missing_directory_is_not_an_error():
 
 
 def test_unknown_emotion_has_no_file():
-    scenario = load_scenario("friday_evening")
+    scenario = load_scenario("friday_evening/anya")
     assert face_path("восторг", scenario.faces_dir) is None
 
 

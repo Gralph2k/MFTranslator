@@ -26,7 +26,7 @@ from bot.state import PersonaState
 
 @pytest.fixture
 def scenario():
-    return load_scenario("first_message")
+    return load_scenario("first_message/vera")
 
 
 def test_chat_scenario_has_profile_and_red_flags(scenario):
@@ -41,7 +41,7 @@ def test_chat_scenario_has_profile_and_red_flags(scenario):
 
 
 def test_in_person_scenario_shows_the_face():
-    date = load_scenario("first_date")
+    date = load_scenario("first_date/vera")
 
     assert date.shows_face
     assert not date.is_correspondence
@@ -82,7 +82,7 @@ def test_backstory_has_no_trainer_frame_and_no_repetitions(scenario):
 
 
 def test_rules_for_a_meeting_still_allow_actions():
-    rules = rules_text(load_scenario("first_date"))
+    rules = rules_text(load_scenario("first_date/vera"))
 
     assert "Протягиваю ей цветок" in rules
 
@@ -173,7 +173,7 @@ def test_persona_prompt_has_correspondence_and_red_lines(scenario):
 
 def test_meeting_prompt_keeps_the_no_emoji_rule():
     """Вживую лицо видно: смайлики там не нужны и остаются запрещёнными."""
-    date = load_scenario("first_date")
+    date = load_scenario("first_date/vera")
     prompt = persona_system_prompt(date, PersonaState.from_mapping(date.initial_state))
 
     assert "без смайликов" in prompt
@@ -245,7 +245,7 @@ def test_drained_heroine_in_chat_does_not_offer_physical_contact(scenario):
     assert "день и время называет он" in text
 
     # На встрече то же состояние остаётся тихим шагом к близости.
-    in_person = state_guidance(drained, load_scenario("first_date"))
+    in_person = state_guidance(drained, load_scenario("first_date/vera"))
     assert "посидеть рядом" in in_person
 
 

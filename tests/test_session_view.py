@@ -31,7 +31,7 @@ def _overview(**overrides) -> SessionOverview:
         "id": 1,
         "user_id": 1,
         "telegram_id": 123456789,
-        "scenario": "friday_evening",
+        "scenario": "friday_evening/anya",
         "created_at": "2026-10-18T15:07:00+00:00",
         "updated_at": "2026-10-18T15:19:00+00:00",
         "user_turns": 10,
@@ -46,7 +46,7 @@ def _stored() -> StoredSession:
     return StoredSession(
         id=1,
         user_id=1,
-        scenario="friday_evening",
+        scenario="friday_evening/anya",
         state={},
         history=[
             {"role": "assistant", "content": "Привет. Я дома."},
@@ -84,7 +84,7 @@ def test_table_shows_requested_columns():
     text = format_table([_overview()])
 
     assert "123456789" in text
-    assert "friday_evening" in text
+    assert "friday_evening/anya" in text
     assert "18.10.26 18:07" in text
     assert "12 мин" in text
     assert "8/12" in text
@@ -103,7 +103,7 @@ def test_active_session_has_no_score_yet():
 
 
 def test_session_details_include_transcript_and_debrief():
-    text = format_session(_overview(), _stored(), load_scenario("friday_evening"))
+    text = format_session(_overview(), _stored(), load_scenario("friday_evening/anya"))
 
     assert "Аня: Привет. Я дома." in text
     assert "Пользователь: Как ты?" in text
@@ -127,7 +127,7 @@ def test_table_says_how_many_sessions_are_shown():
 def test_interactive_lists_then_waits_for_a_session_number(store):
     user = store.ensure_user(42)
     session_id = store.create_session(
-        user, "friday_evening", {}, [{"role": "user", "content": "Привет"}]
+        user, "friday_evening/anya", {}, [{"role": "user", "content": "Привет"}]
     )
     store.save_debrief(session_id, "Итог: 8 из 12")
 
@@ -143,7 +143,7 @@ def test_interactive_lists_then_waits_for_a_session_number(store):
 
     text = "\n".join(output)
     assert "Номер сессии" in prompts[0]
-    assert "friday_evening" in text
+    assert "friday_evening/anya" in text
     assert "Итог: 8 из 12" in text
     # После карточки список показывается заново, и снова ждём ввод.
     assert text.count("Всего сессий:") == 2
@@ -163,7 +163,7 @@ def test_interactive_reports_unknown_session(store):
 def test_interactive_shows_only_the_last_twenty(store):
     user = store.ensure_user(1)
     for _ in range(25):
-        store.create_session(user, "friday_evening", {}, [])
+        store.create_session(user, "friday_evening/anya", {}, [])
 
     def read(prompt: str) -> str:
         raise EOFError

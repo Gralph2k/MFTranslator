@@ -149,7 +149,7 @@ description: Use when designing or revising a training scenario for the emotion 
 - Анкета видна только сценарию с `medium: "chat"`: загрузчик сам подставляет
   `profile` из героини и оставляет пустым у созвона и сцены вживую.
 
-Сценарий — это папка `scenarios/<id>/`: внутри `scenario.json` и `images/`
+Сценарий — это папка `scenarios/<сцена>/<героиня>/`: внутри `scenario.json` и `images/`, id сценария — путь (`first_message/eva`)
 с фотографиями именно этой сцены (`calm.jpg`, `guarded.jpg`, …). Героиня — папка
 `heroines/<slug>/` с `heroine.json`; фотографии в ней не лежат, они сценные. Наборы
 не смешиваются: у каждого сценария своя папка, поэтому одно лицо не может
@@ -201,7 +201,7 @@ description: Use when designing or revising a training scenario for the emotion 
 Созвон — третий канал: ни лица, ни переписки, только голос. Пишется как
 `medium: "call"` и наследует переписку из сценария-предшественника.
 
-- `continues` — id предшественника (например, `first_message`). Бот берёт
+- `continues` — id предшественника (например, `first_message/vera`). Бот берёт
   **последнюю попытку** игрока: доигранную (есть разбор) и не оборванную красной
   линией. Иначе — `canon_history`.
 - `canon_history` — эталонная стенограмма на случай, если прошлой попытки нет.
@@ -295,7 +295,7 @@ description: Use when designing or revising a training scenario for the emotion 
 
 ## Ориентир
 
-`scenarios/friday_evening/scenario.json` — эталон схемы и тона: закрытая женщина, скрытая
+`scenarios/friday_evening/anya/scenario.json` — эталон схемы и тона: закрытая женщина, скрытая
 причина, ловушки-советы, финал через заботу и границу.
-`scenarios/first_message/scenario.json` — эталон переписки: анкета, пустой `opening`,
+`scenarios/first_message/vera/scenario.json` — эталон переписки: анкета, пустой `opening`,
 красные линии, финал через конкретный созвон.

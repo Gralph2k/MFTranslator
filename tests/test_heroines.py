@@ -30,59 +30,59 @@ def test_two_heroines_in_order():
 def test_vera_has_three_scenarios_in_story_order():
     vera = next(heroine for heroine in heroines() if heroine.id == "vera")
 
-    assert vera.scenarios == ("first_message", "first_call", "first_date")
-    assert vera.first_scenario == "first_message"
+    assert vera.scenarios == ("first_message/vera", "first_call/vera", "first_date/vera")
+    assert vera.first_scenario == "first_message/vera"
 
 
 def test_eva_has_three_scenarios_in_story_order():
     eva = next(heroine for heroine in heroines() if heroine.id == "eva")
 
-    assert eva.scenarios == ("eva_message", "eva_call", "eva_date")
-    assert eva.first_scenario == "eva_message"
+    assert eva.scenarios == ("first_message/eva", "first_call/eva", "first_date/eva")
+    assert eva.first_scenario == "first_message/eva"
     assert load_scenario(eva.first_scenario).is_correspondence
-    assert load_scenario("eva_call").is_call
-    assert load_scenario("eva_date").shows_face
+    assert load_scenario("first_call/eva").is_call
+    assert load_scenario("first_date/eva").shows_face
 
 
 def test_disabled_scenarios_are_out_of_rotation():
-    assert "friday_evening" not in available_scenarios()
-    assert "reunion_call" not in available_scenarios()
+    assert "friday_evening/anya" not in available_scenarios()
+    assert "reunion_call/ira" not in available_scenarios()
     # Но файлы целы и грузятся по id — «на будущее».
-    assert load_scenario("friday_evening").enabled is False
-    assert "friday_evening" in all_scenarios()
+    assert load_scenario("friday_evening/anya").enabled is False
+    assert "friday_evening/anya" in all_scenarios()
 
 
 def test_story_chain_walks_through_heroines_and_wraps():
     assert story_scenarios() == [
-        "first_message",
-        "first_call",
-        "first_date",
-        "eva_message",
-        "eva_call",
-        "eva_date",
+        "first_message/vera",
+        "first_call/vera",
+        "first_date/vera",
+        "first_message/eva",
+        "first_call/eva",
+        "first_date/eva",
     ]
-    assert next_scenario_id("first_message") == "first_call"
-    assert next_scenario_id("first_call") == "first_date"
-    assert next_scenario_id("first_date") == "eva_message"
-    assert next_scenario_id("eva_message") == "eva_call"
-    assert next_scenario_id("eva_call") == "eva_date"
-    assert next_scenario_id("eva_date") == "first_message"
-    assert next_scenario_id("нет-такого") == "first_message"
+    assert next_scenario_id("first_message/vera") == "first_call/vera"
+    assert next_scenario_id("first_call/vera") == "first_date/vera"
+    assert next_scenario_id("first_date/vera") == "first_message/eva"
+    assert next_scenario_id("first_message/eva") == "first_call/eva"
+    assert next_scenario_id("first_call/eva") == "first_date/eva"
+    assert next_scenario_id("first_date/eva") == "first_message/vera"
+    assert next_scenario_id("нет-такого") == "first_message/vera"
 
 
 def test_heroine_for_scenario():
-    assert heroine_for("first_date").id == "vera"
-    assert heroine_for("eva_message").id == "eva"
-    assert heroine_for("friday_evening") is None
+    assert heroine_for("first_date/vera").id == "vera"
+    assert heroine_for("first_message/eva").id == "eva"
+    assert heroine_for("friday_evening/anya") is None
 
 
 def test_persona_is_shared_between_vera_scenarios():
     """Личность одна: имя, возраст, профессия и характер не расходятся по сценам."""
     personas = {
         scenario_id: load_scenario(scenario_id).persona
-        for scenario_id in ("first_message", "first_call", "first_date")
+        for scenario_id in ("first_message/vera", "first_call/vera", "first_date/vera")
     }
-    base = personas["first_message"]
+    base = personas["first_message/vera"]
 
     for persona in personas.values():
         assert persona.name == base.name == "Вера"
@@ -98,9 +98,9 @@ def test_persona_is_shared_between_eva_scenarios():
     """Ева в переписке, на созвоне и на свидании — один человек, не три похожие."""
     personas = {
         scenario_id: load_scenario(scenario_id).persona
-        for scenario_id in ("eva_message", "eva_call", "eva_date")
+        for scenario_id in ("first_message/eva", "first_call/eva", "first_date/eva")
     }
-    base = personas["eva_message"]
+    base = personas["first_message/eva"]
 
     for persona in personas.values():
         assert persona.name == base.name == "Ева"
@@ -112,9 +112,9 @@ def test_persona_is_shared_between_eva_scenarios():
 
 
 def test_call_and_date_do_not_show_the_profile():
-    assert load_scenario("first_message").profile is not None
-    assert load_scenario("first_call").profile is None
-    assert load_scenario("first_date").profile is None
+    assert load_scenario("first_message/vera").profile is not None
+    assert load_scenario("first_call/vera").profile is None
+    assert load_scenario("first_date/vera").profile is None
 
 
 def test_heroine_file_has_valid_personality():

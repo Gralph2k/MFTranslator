@@ -1,7 +1,7 @@
 # Промпты для Nano Banana: четыре кадра анкеты Евы
 
 Модель: **Gemini 2.5 Flash Image** (в обиходе «Nano Banana»).
-Задача: четыре кадра для карточки анкеты Евы в сценарии `eva_message` — переписка
+Задача: четыре кадра для карточки анкеты Евы в сценарии `first_message/eva` — переписка
 в приложении знакомств. Ева, 26, фрилансер-фотограф: уверенная, амбициозная,
 прямая, живёт на скорости — мотоцикл, поездки, рестораны, съёмки. Анкета не про
 красоту, а про то, что за ней есть жизнь.
@@ -63,8 +63,8 @@
 2. **`profile_2..4.jpg` — только с референсом.** Прикрепляйте утверждённый
    `profile_1.jpg` как изображение-референс и просите сохранить лицо. Меняются
    сцена, поза, одежда и выражение.
-3. **Не смешивайте с Верой и Аней.** Не прикрепляйте `scenarios/first_date/images/*`
-   и `scenarios/friday_evening/images/*`: модель подтянет медно-каштановое каре,
+3. **Не смешивайте с Верой и Аней.** Не прикрепляйте `scenarios/first_date/vera/images/*`
+   и `scenarios/friday_evening/anya/images/*`: модель подтянет медно-каштановое каре,
    оливковую рубашку и аниме-стиль.
 4. **Меняйте сцену, позу и одежду, но не человека.** В каждом промпте есть фраза про
    сохранение лица — не убирайте её. Одежда в каждом кадре своя и своего цвета (см.
@@ -392,10 +392,10 @@ editorial feel. 1:1 square, 1024×1024. No text, no watermark, no logo.
 ## Имена файлов и связка с ботом
 
 ```
-scenarios/eva_message/images/profile_1.jpg
-scenarios/eva_message/images/profile_2.jpg
-scenarios/eva_message/images/profile_3.jpg
-scenarios/eva_message/images/profile_4.jpg
+scenarios/first_message/eva/images/profile_1.jpg
+scenarios/first_message/eva/images/profile_2.jpg
+scenarios/first_message/eva/images/profile_3.jpg
+scenarios/first_message/eva/images/profile_4.jpg
 ```
 
 Анкета Евы — четыре кадра; кадров эмоций у неё нет: в переписке лицо не показывается.

@@ -11,7 +11,7 @@ from bot.state import PersonaState
 
 
 def _scenario():
-    return load_scenario("eva_date")
+    return load_scenario("first_date/eva")
 
 
 def test_date_is_in_person_and_standalone():

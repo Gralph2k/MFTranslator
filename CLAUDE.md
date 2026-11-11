@@ -40,10 +40,10 @@ Telegram-бот: пользователь переписывается с гер
 
 # demo-прогон сценария без сети и ключей; интерактивно: реплики в консоль,
 # /finish — разбор, /state — состояние персонажа
-.\.venv\Scripts\python.exe -m bot.cli --provider demo --scenario eva_message
+.\.venv\Scripts\python.exe -m bot.cli --provider demo --scenario first_message/eva
 
 # то же неинтерактивно (stdin закрывается — CLI сам печатает разбор)
-@('Привет, как ты?','Понимаю, что устала.') | .\.venv\Scripts\python.exe -m bot.cli --provider demo --scenario first_message
+@('Привет, как ты?','Понимаю, что устала.') | .\.venv\Scripts\python.exe -m bot.cli --provider demo --scenario first_message/vera
 
 # проверка окружения: токен, прокси, ключ модели
 .\.venv\Scripts\python.exe -m bot.doctor
@@ -58,14 +58,14 @@ Telegram-бот: пользователь переписывается с гер
 .\run-bot.cmd
 ```
 
-Доступные сценарии: `first_message`, `first_call`, `first_date`, `eva_message`.
-`friday_evening` и `reunion_call` выключены (`enabled: false`) — не «чинить».
+Доступные сценарии: `first_message/vera`, `first_call/vera`, `first_date/vera`, `first_message/eva`.
+`friday_evening/anya` и `reunion_call/ira` выключены (`enabled: false`) — не «чинить».
 Новый сценарий — только по скилу `writing-scenarios` (`.claude/skills/`).
 
 ## Карта кода
 
 ```
-bot/scenario.py      загрузка scenarios/<id>/scenario.json, слияние с личностью героини, контракт
+bot/scenario.py      загрузка scenarios/<сцена>/<героиня>/scenario.json (id — путь, алиасы старых), слияние с личностью героини, контракт
 bot/heroines.py      каталог героинь: порядок, «продолжить», случайный старт с антиповтором
 bot/state.py         состояние: mood + trust/openness/energy в 0..1, notes
 bot/prompts.py       вся педагогика: промпт персонажа, наблюдатель состояния, промпт разбора
@@ -76,7 +76,7 @@ bot/config.py        Settings из окружения и .env
 bot/doctor.py        python -m bot.doctor: токен, прокси, ключ, сеть
 bot/launcher.py      остановка предыдущего бота и PID-файл
 bot/menus.py         клавиатуры: героини → сценарии → «продолжить» после разбора
-bot/faces.py         выбор кадра эмоции по состоянию (scenarios/<id>/images/)
+bot/faces.py         выбор кадра эмоции по состоянию (scenarios/<сцена>/<героиня>/images/)
 bot/profile_card.py  карточка анкеты: UI рисуется кодом поверх фото
 bot/call_screen.py   экран исходящего звонка: тоже код поверх фото
 bot/safety.py        кризисные темы → реальные каналы помощи, сцена обрывается
@@ -89,8 +89,8 @@ bot/tls.py           корни TLS из хранилища Windows (truststore)
 
 ```
 heroines/<slug>/heroine.json   личность: имя, возраст, профессия, traits, speech, profile
-scenarios/<id>/scenario.json   сцена: heroine, relation, secrets, levers, rubric, frame, red_flags
-scenarios/<id>/images/         фотографии именно этой сцены
+scenarios/<сцена>/<героиня>/scenario.json   сцена: heroine, relation, secrets, levers, rubric, frame
+scenarios/<сцена>/<героиня>/images/         фотографии именно этой сцены
 prompts/                       промпты для генерации фото (кадры генерирует владелец)
 tests/                         pytest: контракт, героини, сценарии, faces, storage, trainer
 deploy/                        DEPLOY.md (§7 — деплой), setup.sh, backup.sh, systemd-юнит

@@ -6,7 +6,7 @@
 
 Модель: **Gemini 2.5 Flash Image** (в обиходе «Nano Banana»).
 Задача: один и тот же персонаж в десяти эмоциях, аниме/вебтун, квадрат 1:1.
-Вера — героиня сценария `first_date` («Первое свидание»): 30 лет, редактор, пришла
+Вера — героиня сценария `first_date/vera` («Первое свидание»): 30 лет, редактор, пришла
 на свидание настороженной. Её лицо должно читаться как «слышит фальшь и решает,
 верить ли», а не как «ей плохо».
 
@@ -236,19 +236,19 @@ no exaggerated drama.
 
 ## Имена файлов и связка с ботом
 
-Файлы кладутся в папку сценария — `scenarios/first_date/images/`:
+Файлы кладутся в папку сценария — `scenarios/first_date/vera/images/`:
 
 ```
-scenarios/first_date/images/calm.jpg
-scenarios/first_date/images/guarded.jpg
-scenarios/first_date/images/closed.jpg
-scenarios/first_date/images/irritated.jpg
-scenarios/first_date/images/hurt.jpg
-scenarios/first_date/images/warming.jpg
-scenarios/first_date/images/smiling.jpg
-scenarios/first_date/images/laughing.jpg
-scenarios/first_date/images/tired.jpg
-scenarios/first_date/images/tears.jpg
+scenarios/first_date/vera/images/calm.jpg
+scenarios/first_date/vera/images/guarded.jpg
+scenarios/first_date/vera/images/closed.jpg
+scenarios/first_date/vera/images/irritated.jpg
+scenarios/first_date/vera/images/hurt.jpg
+scenarios/first_date/vera/images/warming.jpg
+scenarios/first_date/vera/images/smiling.jpg
+scenarios/first_date/vera/images/laughing.jpg
+scenarios/first_date/vera/images/tired.jpg
+scenarios/first_date/vera/images/tears.jpg
 ```
 
 Префиксы не нужны: папка сама по себе означает персонажа. Сценарий — это папка
@@ -257,6 +257,6 @@ scenarios/first_date/images/tears.jpg
 `bot/faces.py` берёт картинку из `scenario.faces_dir`. Если какого-то кадра ещё нет,
 бот молча пришлёт только текст — сцены это не ломает.
 
-Приоритет для `first_date`: `guarded`, `closed`, `irritated`, `warming`, `smiling`,
+Приоритет для `first_date/vera`: `guarded`, `closed`, `irritated`, `warming`, `smiling`,
 `laughing`. `calm`, `tired` и `tears` нужны реже, но пусть будут: состояние зависит
 от хода игрока, а не от сценария.

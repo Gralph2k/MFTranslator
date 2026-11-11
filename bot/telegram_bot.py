@@ -18,7 +18,7 @@ from .engine import DialogueEngine, DialogueSession
 from .faces import emotion_for_state, face_path
 from .launcher import clear_pid, write_pid
 from .llm import DeepSeekLLM, LLM
-from .heroines import random_heroine
+from .heroines import random_heroine, story_scenarios
 from .menus import (
     after_finish_menu,
     heroine_menu,
@@ -27,7 +27,7 @@ from .menus import (
 from .profile_card import render_profile_cards
 from .prompts import backstory_text, profile_text, rules_text
 from .safety import CrisisDetected, safety_message
-from .scenario import Scenario, ScenarioError, available_scenarios, load_scenario
+from .scenario import Scenario, ScenarioError, load_scenario
 from .state import PersonaState
 from .storage import Storage, StoredSession
 
@@ -554,7 +554,7 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     settings = load_settings()
-    scenario = load_scenario(available_scenarios()[0])
+    scenario = load_scenario(story_scenarios()[0])
     asyncio.run(_run(settings, scenario))
 
 

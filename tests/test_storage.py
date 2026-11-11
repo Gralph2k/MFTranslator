@@ -29,7 +29,7 @@ def test_user_is_created_once(storage):
 def test_session_roundtrip(storage):
     user = storage.ensure_user(42)
     history = [{"role": "assistant", "content": "Всё нормально."}]
-    session_id = storage.create_session(user, "friday_evening", {"trust": 0.5}, history)
+    session_id = storage.create_session(user, "friday_evening/anya", {"trust": 0.5}, history)
 
     loaded = storage.get_active_session(user)
     assert loaded is not None
@@ -41,7 +41,7 @@ def test_session_roundtrip(storage):
 
 def test_finished_session_is_not_active(storage):
     user = storage.ensure_user(42)
-    session_id = storage.create_session(user, "friday_evening", {}, [])
+    session_id = storage.create_session(user, "friday_evening/anya", {}, [])
     storage.save_session(session_id, {}, [], user_turns=3, finished=True)
 
     assert storage.get_active_session(user) is None
@@ -50,7 +50,7 @@ def test_finished_session_is_not_active(storage):
 
 def test_debrief_is_saved_and_returned(storage):
     user = storage.ensure_user(7)
-    session_id = storage.create_session(user, "friday_evening", {}, [])
+    session_id = storage.create_session(user, "friday_evening/anya", {}, [])
     storage.save_debrief(session_id, "Итог: 8 из 12")
 
     assert storage.last_debrief(user) == "Итог: 8 из 12"
@@ -58,7 +58,7 @@ def test_debrief_is_saved_and_returned(storage):
 
 def test_delete_user_removes_everything(storage):
     user = storage.ensure_user(7)
-    session_id = storage.create_session(user, "friday_evening", {}, [])
+    session_id = storage.create_session(user, "friday_evening/anya", {}, [])
     storage.save_debrief(session_id, "разбор")
     storage.delete_user(7)
 
@@ -78,7 +78,7 @@ def test_session_remembers_start_and_last_activity(storage, monkeypatch):
     monkeypatch.setattr(storage_module, "_now", lambda: next(times))
 
     user = storage.ensure_user(42)
-    session_id = storage.create_session(user, "friday_evening", {}, [])
+    session_id = storage.create_session(user, "friday_evening/anya", {}, [])
     storage.save_session(session_id, {}, [], user_turns=4, finished=False)
 
     loaded = storage.get_session(session_id)
@@ -88,7 +88,7 @@ def test_session_remembers_start_and_last_activity(storage, monkeypatch):
 
 def test_overview_joins_user_and_latest_debrief(storage):
     user = storage.ensure_user(42)
-    session_id = storage.create_session(user, "friday_evening", {}, [])
+    session_id = storage.create_session(user, "friday_evening/anya", {}, [])
     storage.save_session(session_id, {}, [], user_turns=3, finished=True)
     storage.save_debrief(session_id, "Итог: 8 из 12")
     storage.save_debrief(session_id, "Итог: 10 из 12")
@@ -100,7 +100,7 @@ def test_overview_joins_user_and_latest_debrief(storage):
     assert row.id == session_id
     assert row.user_id == user
     assert row.telegram_id == 42
-    assert row.scenario == "friday_evening"
+    assert row.scenario == "friday_evening/anya"
     assert row.user_turns == 3
     assert row.finished is True
     assert row.debrief == "Итог: 10 из 12"
@@ -109,7 +109,7 @@ def test_overview_joins_user_and_latest_debrief(storage):
 def test_overview_can_be_limited_to_latest(storage):
     user = storage.ensure_user(1)
     for _ in range(3):
-        storage.create_session(user, "friday_evening", {}, [])
+        storage.create_session(user, "friday_evening/anya", {}, [])
 
     rows = storage.list_overview(limit=2)
 
@@ -171,5 +171,45 @@ def test_old_database_gets_updated_at_from_debrief_or_start():
         assert loaded.created_at == "2026-10-18T10:00:00+00:00"
         # Без отдельной колонки длительность не восстановить: берём время разбора.
         assert loaded.updated_at == "2026-10-18T10:09:00+00:00"
+    finally:
+        store.close()
+
+
+def test_old_flat_scenario_ids_are_renamed_on_open():
+    """Сценарии переехали в <сцена>/<героиня>: старые id в БД переименовываются."""
+    folder = TMP_ROOT / f"rename-{uuid.uuid4().hex[:8]}"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / "old.db"
+
+    conn = sqlite3.connect(path)
+    conn.executescript(OLD_SCHEMA)
+    conn.execute(
+        "INSERT INTO users (telegram_id, created_at) VALUES (42, '2026-10-18T10:00:00+00:00')"
+    )
+    conn.execute(
+        """INSERT INTO sessions
+           (user_id, scenario_id, state_json, history_json, user_turns, finished, created_at)
+           VALUES (1, 'eva_message', '{}', '[]', 1, 0, '2026-10-18T10:00:00+00:00')"""
+    )
+    conn.execute(
+        """INSERT INTO sessions
+           (user_id, scenario_id, state_json, history_json, user_turns, finished, created_at)
+           VALUES (1, 'friday_evening', '{}', '[]', 1, 0, '2026-10-18T10:05:00+00:00')"""
+    )
+    conn.commit()
+    conn.close()
+
+    store = Storage(path)
+    try:
+        with sqlite3.connect(path) as conn:
+            rows = dict(conn.execute("SELECT id, scenario_id FROM sessions"))
+        assert rows[1] == "first_message/eva"
+        assert rows[2] == "friday_evening/anya"
+        # Идемпотентность: повторное открытие ничего не ломает.
+        reopened = Storage(path)
+        reopened.close()
+        with sqlite3.connect(path) as conn:
+            rows_after = dict(conn.execute("SELECT id, scenario_id FROM sessions"))
+        assert rows_after == rows
     finally:
         store.close()

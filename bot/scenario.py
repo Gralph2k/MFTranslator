@@ -17,6 +17,21 @@ SCENARIO_DIR = ROOT / "scenarios"
 SCENARIO_FILE = "scenario.json"
 IMAGES_DIR = "images"
 
+# Совместимость: сценарии переехали из плоских папок `scenarios/<id>/` в
+# `scenarios/<сцена>/<героиня>/`, а id стал путём (`first_message/eva`).
+# Старые id встречаются в БД до миграции значений и в кнопках старых чатов:
+# загрузчик принимает их как алиасы новых.
+SCENARIO_ID_ALIASES: dict[str, str] = {
+    "first_message": "first_message/vera",
+    "first_call": "first_call/vera",
+    "first_date": "first_date/vera",
+    "eva_message": "first_message/eva",
+    "eva_call": "first_call/eva",
+    "eva_date": "first_date/eva",
+    "friday_evening": "friday_evening/anya",
+    "reunion_call": "reunion_call/ira",
+}
+
 
 class ScenarioError(ValueError):
     """Сценарий не загрузился или в нём не хватает полей."""
@@ -376,22 +391,31 @@ def _as_bool(value: Any, default: bool) -> bool:
 
 
 def _scenario_file(name_or_path: str | Path) -> Path:
-    """Приводит имя, папку или путь к файлу к пути scenario.json."""
+    """Приводит имя, папку или путь к файлу к пути scenario.json.
+
+    id сценария — путь относительно `scenarios/` (`first_message/eva`), поэтому
+    каждый элемент пути кладётся на своё место, а не сваливается в одно имя.
+    """
     path = Path(name_or_path)
     if path.is_dir():
         return path / SCENARIO_FILE
     if path.suffix == ".json":
         return path
-    return SCENARIO_DIR / path.name / SCENARIO_FILE
+    return SCENARIO_DIR.joinpath(*path.parts) / SCENARIO_FILE
 
 
-def load_scenario(name_or_path: str | Path = "friday_evening") -> Scenario:
+def load_scenario(name_or_path: str | Path = "friday_evening/anya") -> Scenario:
     """Загружает сценарий по id, по папке или по пути к scenario.json.
 
     Если сценарий ссылается на героиню, личность и анкета читаются из
     `heroines/<slug>/heroine.json` — один источник на все её сценарии.
+    Старый плоский id (`first_call`) принимается как алиас нового.
     """
     path = _scenario_file(name_or_path)
+    if not path.exists():
+        alias = SCENARIO_ID_ALIASES.get(str(name_or_path))
+        if alias:
+            path = _scenario_file(alias)
     if not path.exists():
         raise ScenarioError(f"сценарий не найден: {name_or_path}")
 
@@ -412,8 +436,14 @@ def load_scenario(name_or_path: str | Path = "friday_evening") -> Scenario:
 
 
 def all_scenarios() -> list[str]:
-    """Id всех сценариев, включая выключенные: нужен для контракта и CLI."""
-    names = [p.parent.name for p in SCENARIO_DIR.glob(f"*/{SCENARIO_FILE}")]
+    """Id всех сценариев, включая выключенные: нужен для контракта и CLI.
+
+    Сценарий живёт в `scenarios/<сцена>/<героиня>/`, id — путь с обоими уровнями.
+    """
+    names = [
+        p.parent.relative_to(SCENARIO_DIR).as_posix()
+        for p in SCENARIO_DIR.glob(f"*/*/{SCENARIO_FILE}")
+    ]
     return sorted(names, key=lambda name: (load_scenario(name).order, name))
 
 

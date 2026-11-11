@@ -1,6 +1,6 @@
 ---
 description: Пошаговый деплой на VPS по deploy/DEPLOY.md §7 — с обязательной остановкой перед scp и restart
-argument-hint: [что меняется, например "сценарий eva_message"]
+argument-hint: [что меняется, например "сценарий first_message/eva"]
 ---
 
 Обновление боевого бота. **Правило проекта: любое изменение кода, сценариев или
@@ -9,21 +9,21 @@ argument-hint: [что меняется, например "сценарий eva_
 
 Выполняй **только по явной команде владельца** и с двумя жёсткими остановками:
 перед отправкой архива (шаг 5) и перед `systemctl restart` (шаг 7). До подтверждения
-— только локальные шаги и чтение. `ssh`/`scp`/`tar` требуют подтверждения прав
-(это нормально), `git push` запрещён правилами.
+— только локальные шаги и чтение. `ssh`/`scp`/`tar` подтверждаются системой прав
+(это нормально), `git push` запрещён правилами `AGENTS.md` — не предлагать.
 
 ## 0. Сначала прочитать
 
 - `deploy/DEPLOY.md` §7 — единственный правильный порядок, отсюда только копии.
 - Уточни у владельца, что именно меняется. Если правка только в `CLAUDE.md`,
-  `.claude/`, `docs/` — **деплой не нужен**: этих путей нет в архиве, бот они не
-  затрагивают.
+  `.claude/`, `.zcode/`, `docs/` — **деплой не нужен**: этих путей нет в архиве,
+  бот они не затрагивают.
 
 ## 1. Локальные проверки (без сети)
 
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe -m bot.cli --provider demo --scenario <id>
+```bash
+PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -m pytest -q
+PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -m bot.cli --provider demo --scenario <id>
 ```
 
 Ожидаемо: `216 passed` и разбор доходит до конца, exit 0. Падения — стоп, деплой
@@ -31,7 +31,7 @@ argument-hint: [что меняется, например "сценарий eva_
 
 ## 2. Показать, что уходит
 
-```powershell
+```bash
 git status --short
 git diff --stat
 ```
@@ -40,15 +40,15 @@ git diff --stat
 
 ## 3. Бэкап базы на сервере (данные не трогаем)
 
-```powershell
+```bash
 ssh root@48.102.186.191 "bash /opt/mf-translator/deploy/backup.sh"
 ```
 
 ## 4. Архив только из нужных путей
 
-```powershell
-New-Item -ItemType Directory -Force .tmp | Out-Null
-tar -czf .tmp\update.tgz AGENTS.md README.md PROGRESS.md pyproject.toml .env.example .gitignore run-bot.cmd run-cli.cmd sessions.cmd bot deploy heroines scenarios prompts tests
+```bash
+mkdir -p .tmp
+tar -czf .tmp/update.tgz AGENTS.md README.md PROGRESS.md pyproject.toml .env.example .gitignore run-bot.cmd run-cli.cmd sessions.cmd bot deploy heroines scenarios prompts tests
 ```
 
 `.env`, `data/`, `.git`, `.venv`, `.tmp` в архив не входят — поэтому на сервере они
@@ -56,17 +56,17 @@ tar -czf .tmp\update.tgz AGENTS.md README.md PROGRESS.md pyproject.toml .env.exa
 
 ## 5. СТОП — подтверждение перед отправкой
 
-Покажи владельцу: `git status --short`, размер `.tmp\update.tgz`, что именно
+Покажи владельцу: `git status --short`, размер `.tmp/update.tgz`, что именно
 меняется в поведении бота. Спроси прямо: **«Отправлять на сервер?»** Без «да»
 остановись здесь.
 
-```powershell
-scp .tmp\update.tgz root@48.102.186.191:/opt/update.tgz
+```bash
+scp .tmp/update.tgz root@48.102.186.191:/opt/update.tgz
 ```
 
 ## 6. Распаковка, права, зависимости (на сервере, одной командой)
 
-```powershell
+```bash
 ssh root@48.102.186.191 "cd /opt && tar -xzf update.tgz -C /opt/mf-translator && rm update.tgz && chown -R trainer:trainer /opt/mf-translator && chmod -R u=rwX,go=rX /opt/mf-translator/bot /opt/mf-translator/deploy /opt/mf-translator/scenarios /opt/mf-translator/heroines /opt/mf-translator/tests /opt/mf-translator/prompts && find /opt/mf-translator -maxdepth 1 -type f -exec chmod 644 {} + && chmod 600 /opt/mf-translator/.env && chmod 750 /opt/mf-translator/data && (chmod 600 /opt/mf-translator/data/bot.db 2>/dev/null || true) && sudo -u trainer -H /opt/mf-translator/.venv/bin/pip install -q -e /opt/mf-translator"
 ```
 
@@ -82,7 +82,7 @@ ssh root@48.102.186.191 "cd /opt && tar -xzf update.tgz -C /opt/mf-translator &&
 Спроси: **«Перезапускать emotion-trainer?»** Перезапуск обрывает текущие диалоги
 пользователей. Без «да» — остановись.
 
-```powershell
+```bash
 ssh root@48.102.186.191 "systemctl restart emotion-trainer"
 ```
 
@@ -96,8 +96,8 @@ MainPID сервиса совпадает с `/opt/mf-translator/data/bot.pid`, 
 Traceback/Conflict`; при провале — exit ≠ 0. Ничего не меняет: только `systemctl
 show`, `cat`, `journalctl`, `grep`.
 
-```powershell
-@'
+```bash
+ssh -o BatchMode=yes -o ConnectTimeout=10 root@48.102.186.191 bash -s <<'EOF'
 set -e
 main=$(systemctl show -p MainPID --value emotion-trainer)
 test -n "$main" && test "$main" != 0
@@ -109,7 +109,7 @@ echo "$logs" | grep -q "Run polling"
 ! echo "$logs" | grep -q "Traceback"
 ! echo "$logs" | grep -q "Conflict"
 echo "OK: active, PID $main, Бот запущен + Run polling, без Traceback/Conflict"
-'@ | ssh -o BatchMode=yes -o ConnectTimeout=10 root@48.102.186.191 bash -s
+EOF
 ```
 
 Почему не `journalctl -n 20 | grep`: в истории сервера есть старые `Traceback`

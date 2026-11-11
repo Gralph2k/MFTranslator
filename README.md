@@ -109,7 +109,7 @@ Telegram:
 ```
 heroines/<slug>/                кто она: личность и анкета
   heroine.json                  имя, возраст, профессия, характер, голос, анкета
-scenarios/<id>/                 что происходит в сцене
+scenarios/<сцена>/<героиня>/    что происходит в сцене; id = путь (`first_message/eva`)
   scenario.json                 heroine, relation, ситуация, секреты, ловушки, рубрика
   images/                       фотографии именно этой сцены
 bot/scenario.py                 загрузка сценария и слияние с личностью героини
@@ -158,9 +158,9 @@ bot/telegram_bot.py             aiogram 3: команды и диалог
 Фотографии лежат внутри сценария — в его папке `images/`:
 
 ```
-scenarios/first_message/images/profile_1.jpg
-scenarios/first_date/images/calm.jpg
-scenarios/eva_message/images/profile_1.jpg
+scenarios/first_message/vera/images/profile_1.jpg
+scenarios/first_date/vera/images/calm.jpg
+scenarios/first_message/eva/images/profile_1.jpg
 ...
 ```
 
