@@ -1,6 +1,6 @@
 # Деплой на VPS
 
-Сервер под этот бот: **Ubuntu 22.04, 1 vCPU, 2 GB RAM, 30 GB**, IP **138.124.229.233**,
+Сервер под этот бот: **Ubuntu 22.04, 1 vCPU, 2 GB RAM, 30 GB**, IP **48.102.186.191**,
 хостинг `nuxt.cloud` (Германия, AS216127). Для России это важно: Telegram там не
 блокируется, поэтому `TELEGRAM_PROXY` скорее всего не понадобится — проверит `bot.doctor`.
 
@@ -28,7 +28,7 @@ polling домен не нужен вообще: бот сам ходит в Tel
    обязательны, иначе ключ разобьётся на аргументы и запишется битым):
 
    ```powershell
-   ssh root@138.124.229.233 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo 'ssh-ed25519 AAAA...ТВОЙ_КЛЮЧ... you@pc' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+   ssh root@48.102.186.191 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo 'ssh-ed25519 AAAA...ТВОЙ_КЛЮЧ... you@pc' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
    ```
 
    Пароль спросится один раз. Публичный ключ не секретен, но приватный
@@ -37,7 +37,7 @@ polling домен не нужен вообще: бот сам ходит в Tel
 Проверка — без пароля:
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 "echo OK; hostname"
+ssh -o BatchMode=yes root@48.102.186.191 "echo OK; hostname"
 ```
 
 Если вывело `OK` — ключ работает, и `scp`/`tar` из раздела 1 пойдут без пароля.
@@ -46,7 +46,7 @@ ssh -o BatchMode=yes root@138.124.229.233 "echo OK; hostname"
 
 ```
 Host trainer
-    HostName 138.124.229.233
+    HostName 48.102.186.191
     User root
     IdentityFile ~/.ssh/id_ed25519
     IdentitiesOnly yes
@@ -85,7 +85,7 @@ sudo sshd -t && sudo systemctl reload ssh
 ```powershell
 # архив кладём рядом с папкой проекта: внутри tree tar записал бы в него сам себя
 tar -czf ..\mf-translator.tgz --exclude=.venv --exclude=.git --exclude=data --exclude=.tmp --exclude=.env --exclude=.uv-cache --exclude=.idea --exclude=.dsh --exclude=.tmp-dsh-ui* --exclude=pytest-cache-files-* --exclude="^dsh" .
-scp ..\mf-translator.tgz root@138.124.229.233:/opt/
+scp ..\mf-translator.tgz root@48.102.186.191:/opt/
 ```
 
 На сервере:
@@ -98,7 +98,7 @@ rm /opt/mf-translator.tgz
 
 Переносить историю диалогов с рабочей машины не обязательно. Если нужна — снимай
 снимок, а не копируй живой файл: `sqlite3 data/bot.db ".backup data/bot-copy.db"`,
-затем `scp data\bot-copy.db root@138.124.229.233:/opt/mf-translator/data/bot.db`
+затем `scp data\bot-copy.db root@48.102.186.191:/opt/mf-translator/data/bot.db`
 (папку `data` создать заранее).
 
 Альтернатива — git: закоммитить и запушить, на сервере `git clone`. Git у репозитория
@@ -237,11 +237,11 @@ sudo journalctl -u emotion-trainer -n 50 --no-pager
 .venv\Scripts\python.exe -m bot.cli --provider demo --scenario <id>
 
 # 1. бэкап базы на сервере (данные не трогаем)
-ssh root@138.124.229.233 "bash /opt/mf-translator/deploy/backup.sh"
+ssh root@48.102.186.191 "bash /opt/mf-translator/deploy/backup.sh"
 
 # 2. архив только из нужных путей: .env, data, .git, .venv в него не попадают
 tar -czf .tmp\update.tgz AGENTS.md README.md PROGRESS.md pyproject.toml .env.example .gitignore run-bot.cmd run-cli.cmd sessions.cmd bot deploy heroines scenarios prompts tests
-scp .tmp\update.tgz root@138.124.229.233:/opt/update.tgz
+scp .tmp\update.tgz root@48.102.186.191:/opt/update.tgz
 ```
 
 ```bash

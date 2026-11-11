@@ -76,7 +76,7 @@ safety-слой, `bot.doctor`, `launcher`, `sessions.cmd` с синхрониз�
 4. `.\.venv\Scripts\python.exe -m bot.doctor` → DeepSeek `OK`; Telegram
    `ConnectTimeout` с этой машины **ожидаем** (нужен VPN/прокси, прод живёт отдельно).
 5. Продакшен read-only:
-   `ssh -o BatchMode=yes root@138.124.229.233 "systemctl is-active emotion-trainer; journalctl -u emotion-trainer -n 5 --no-pager"`
+   `ssh -o BatchMode=yes root@48.102.186.191 "systemctl is-active emotion-trainer; journalctl -u emotion-trainer -n 5 --no-pager"`
    → `active` и свежие строки без `Traceback`/`Conflict`.
 6. Убедиться, что защита работает: попросить агента прочитать `.env` и запушить —
    оба должны быть отклонены конфигурацией прав.
@@ -182,7 +182,7 @@ safety-слой, `bot.doctor`, `launcher`, `sessions.cmd` с синхрониз�
 Проверено 11.11.2026: `pytest -q` → **216 passed**; demo-прогоны `eva_message` и
 `first_message` → разбор, exit 0; `bot.doctor` → DeepSeek `OK`, Telegram
 `ConnectTimeout` (ожидаемо). **SSH до VPS из этой сети с 11.11 не проходит**
-(`connect to host 138.124.229.233 port 22: Connection timed out`) — read-only
+(`connect to host 48.102.186.191 port 22: Connection timed out`) — read-only
 проверку прода и деплой делать только когда сеть снова пропускает (VPN); пока не
 проверено, что прод жив.
 
@@ -201,7 +201,7 @@ $ .\.venv\Scripts\python.exe -m pytest -q            → 216 passed in 3.33s
 $ ... -m bot.cli --provider demo --scenario eva_message   → разбор «9 из 12», exit 0
 $ ... -m bot.cli --provider demo --scenario first_message → разбор, exit 0
 $ ... -m bot.doctor    → [OK] DeepSeek; [ОШИБКА] Telegram ConnectTimeout (сеть)
-$ ssh root@138.124.229.233 "systemctl is-active emotion-trainer" → active
+$ ssh root@48.102.186.191 "systemctl is-active emotion-trainer" → active
 $ ssh ... "journalctl -u emotion-trainer -n 5" → «Бот запущен», «Run polling», без Traceback
 $ ssh ... "sha256sum bot/engine.py ..." → совпадает с локальным
 ```

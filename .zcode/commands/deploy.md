@@ -4,7 +4,7 @@ argument-hint: [что меняется, например "сценарий eva_
 ---
 
 Обновление боевого бота. **Правило проекта: любое изменение кода, сценариев или
-конфигурации деплоится и перезапускает бота.** Сервер: `root@138.124.229.233`,
+конфигурации деплоится и перезапускает бота.** Сервер: `root@48.102.186.191`,
 код `/opt/mf-translator`, сервис `emotion-trainer`.
 
 Выполняй **только по явной команде владельца** и с двумя жёсткими остановками:
@@ -41,7 +41,7 @@ git diff --stat
 ## 3. Бэкап базы на сервере (данные не трогаем)
 
 ```bash
-ssh root@138.124.229.233 "bash /opt/mf-translator/deploy/backup.sh"
+ssh root@48.102.186.191 "bash /opt/mf-translator/deploy/backup.sh"
 ```
 
 ## 4. Архив только из нужных путей
@@ -61,17 +61,17 @@ tar -czf .tmp/update.tgz AGENTS.md README.md PROGRESS.md pyproject.toml .env.exa
 остановись здесь.
 
 ```bash
-scp .tmp/update.tgz root@138.124.229.233:/opt/update.tgz
+scp .tmp/update.tgz root@48.102.186.191:/opt/update.tgz
 ```
 
 ## 6. Распаковка, права, зависимости (на сервере, одной командой)
 
 ```bash
-ssh root@138.124.229.233 "cd /opt && tar -xzf update.tgz -C /opt/mf-translator && rm update.tgz && chown -R trainer:trainer /opt/mf-translator && chmod -R u=rwX,go=rX /opt/mf-translator/bot /opt/mf-translator/deploy /opt/mf-translator/scenarios /opt/mf-translator/heroines /opt/mf-translator/tests /opt/mf-translator/prompts && find /opt/mf-translator -maxdepth 1 -type f -exec chmod 644 {} + && chmod 600 /opt/mf-translator/.env && chmod 750 /opt/mf-translator/data && (chmod 600 /opt/mf-translator/data/bot.db 2>/dev/null || true) && sudo -u trainer -H /opt/mf-translator/.venv/bin/pip install -q -e /opt/mf-translator"
+ssh root@48.102.186.191 "cd /opt && tar -xzf update.tgz -C /opt/mf-translator && rm update.tgz && chown -R trainer:trainer /opt/mf-translator && chmod -R u=rwX,go=rX /opt/mf-translator/bot /opt/mf-translator/deploy /opt/mf-translator/scenarios /opt/mf-translator/heroines /opt/mf-translator/tests /opt/mf-translator/prompts && find /opt/mf-translator -maxdepth 1 -type f -exec chmod 644 {} + && chmod 600 /opt/mf-translator/.env && chmod 750 /opt/mf-translator/data && (chmod 600 /opt/mf-translator/data/bot.db 2>/dev/null || true) && sudo -u trainer -H /opt/mf-translator/.venv/bin/pip install -q -e /opt/mf-translator"
 ```
 
 Если менялся `deploy/emotion-trainer.service` — дополнительно
-`ssh root@138.124.229.233 "bash /opt/mf-translator/deploy/setup.sh"`.
+`ssh root@48.102.186.191 "bash /opt/mf-translator/deploy/setup.sh"`.
 
 В команде выше к списку `chmod` из §7 добавлен каталог `heroines/`: в `DEPLOY.md` его
 нет (известное замечание, см. `docs/migration/deploy-and-testing.md` §9), а без него
@@ -83,7 +83,7 @@ ssh root@138.124.229.233 "cd /opt && tar -xzf update.tgz -C /opt/mf-translator &
 пользователей. Без «да» — остановись.
 
 ```bash
-ssh root@138.124.229.233 "systemctl restart emotion-trainer"
+ssh root@48.102.186.191 "systemctl restart emotion-trainer"
 ```
 
 ## 8. Проверка (обязательно, не пропускать)
@@ -97,7 +97,7 @@ Traceback/Conflict`; при провале — exit ≠ 0. Ничего не м�
 show`, `cat`, `journalctl`, `grep`.
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 root@138.124.229.233 bash -s <<'EOF'
+ssh -o BatchMode=yes -o ConnectTimeout=10 root@48.102.186.191 bash -s <<'EOF'
 set -e
 main=$(systemctl show -p MainPID --value emotion-trainer)
 test -n "$main" && test "$main" != 0
@@ -121,7 +121,7 @@ EOF
 - Если проверка упала, потому что `Run polling` ещё нет (бот стартует) — подожди
   10 с и повтори; если через 30 с нет — `docs/migration/deploy-and-testing.md` §8.5.
 - Быстрый «жив ли» без скрипта (§8.3):
-  `ssh -o BatchMode=yes root@138.124.229.233 'systemctl is-active emotion-trainer; journalctl -u emotion-trainer -n 3 --no-pager'`.
+  `ssh -o BatchMode=yes root@48.102.186.191 'systemctl is-active emotion-trainer; journalctl -u emotion-trainer -n 3 --no-pager'`.
 - Если сервис упал: `journalctl -u emotion-trainer -n 100 --no-pager`; частая
   причина — забытая зависимость в `pyproject.toml` или ошибка загрузки сценария.
   Дальше — только факты из лога, без догадок; откат базы — `/var/backups/emotion-trainer/`

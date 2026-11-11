@@ -5,7 +5,7 @@
 откатиться и что делать, когда что-то сломалось.
 
 - Проект: `C:\Projects\MFTranslator` (Windows, основной инструмент — PowerShell).
-- Прод: `root@138.124.229.233`, код в `/opt/mf-translator`, systemd-сервис `emotion-trainer`.
+- Прод: `root@48.102.186.191`, код в `/opt/mf-translator`, systemd-сервис `emotion-trainer`.
 - **Канон порядка деплоя — [`deploy/DEPLOY.md`](../../deploy/DEPLOY.md) §7.** Этот файл
   повторяет его с ожидаемыми результатами и проверками, а не заменяет.
 - Снимок фактов и проверок: **10.11.2026, ~13:45 МСК**. Сервер живёт в
@@ -26,10 +26,10 @@
 | Тесты локально | `.\.venv\Scripts\python.exe -m pytest -q` | `216 passed` (~3.5 с) |
 | Demo-прогон без сети | `.\.venv\Scripts\python.exe -m bot.cli --provider demo --scenario eva_message` | игра доходит до разбора, exit 0 |
 | Проверка окружения | `.\.venv\Scripts\python.exe -m bot.doctor` | DeepSeek `OK`; Telegram локально — `ConnectTimeout` (сеть) |
-| Прод жив? (read-only) | `ssh -o BatchMode=yes root@138.124.229.233 "systemctl is-active emotion-trainer"` | `active` |
+| Прод жив? (read-only) | `ssh -o BatchMode=yes root@48.102.186.191 "systemctl is-active emotion-trainer"` | `active` |
 | Строгая проверка прода | скрипт из §8.2 | `OK: active, PID …, Бот запущен + Run polling, без Traceback/Conflict` |
 | Деплой | §3, шаги 0–9 | `active` + свежие `Бот запущен`/`Run polling` |
-| Бэкап базы | `ssh root@138.124.229.233 "bash /opt/mf-translator/deploy/backup.sh"` | `Готово: /var/backups/emotion-trainer/bot-….db` |
+| Бэкап базы | `ssh root@48.102.186.191 "bash /opt/mf-translator/deploy/backup.sh"` | `Готово: /var/backups/emotion-trainer/bot-….db` |
 | Откат | §5 | сервис `active`, лог чистый |
 
 Ключевые пути: сервер — `/opt/mf-translator`, база — `data/bot.db` (на сервере
@@ -271,14 +271,14 @@ Get-ChildItem deploy\*.sh,deploy\*.cron,deploy\*.service | ForEach-Object {
   вход под `root` работает без пароля. Проверка:
 
 ```powershell
-ssh -o BatchMode=yes -o ConnectTimeout=10 root@138.124.229.233 "echo OK; hostname"
+ssh -o BatchMode=yes -o ConnectTimeout=10 root@48.102.186.191 "echo OK; hostname"
 ```
 
 Ожидаемо: `OK` и `vm1496646.cloud.nuxt.network`. Если висит/просит пароль — ключ
 не тот или сеть; без `OK` дальше не идти.
 
 - Алиаса `trainer` из §0.5 `DEPLOY.md` в системе **нет** (`~/.ssh/config` не создан):
-  во всех командах использовать полное `root@138.124.229.233`.
+  во всех командах использовать полное `root@48.102.186.191`.
 - Инструменты: `tar` = bsdtar 3.7.6 (Windows System32), `ssh`/`scp` = OpenSSH 9.5,
   при необходимости есть Git Bash (`C:\Program Files\Git\bin\bash.exe`).
 - Прод живёт в `Europe/Berlin`; «сейчас» на сервере проверять `ssh … date`.
@@ -297,7 +297,7 @@ ssh -o BatchMode=yes -o ConnectTimeout=10 root@138.124.229.233 "echo OK; hostnam
 а не read-only проверка: `backup.sh` пишет файл в `/var/backups/emotion-trainer`.
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 "bash /opt/mf-translator/deploy/backup.sh"
+ssh -o BatchMode=yes root@48.102.186.191 "bash /opt/mf-translator/deploy/backup.sh"
 ```
 
 Ожидаемо: `Готово: /var/backups/emotion-trainer/bot-2026-11-10_1131.db` (имя —
@@ -344,13 +344,13 @@ if ($names -match '(^|/)\.env$' -or $names -match '(^|/)data/') { 'STOP: в ар
 ### 3.5 Шаг 4. Отправить архив
 
 ```powershell
-scp -o BatchMode=yes .tmp\update.tgz root@138.124.229.233:/opt/update.tgz
+scp -o BatchMode=yes .tmp\update.tgz root@48.102.186.191:/opt/update.tgz
 ```
 
 Ожидаемо: без вывода, exit 0. Проверка на сервере:
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 "ls -l /opt/update.tgz"
+ssh -o BatchMode=yes root@48.102.186.191 "ls -l /opt/update.tgz"
 ```
 
 Ожидаемо: файл с сегодняшним временем и ненулевым размером. Если `Permission
@@ -361,7 +361,7 @@ failed` — изменился ключ хоста: уточнить у влад
 ### 3.6 Шаг 5. Распаковать и выставить права (на сервере)
 
 Блок серверный: отправить его целиком через `bash -s` (надёжно, без проблем
-с кавычками PowerShell) или выполнить после `ssh root@138.124.229.233`.
+с кавычками PowerShell) или выполнить после `ssh root@48.102.186.191`.
 
 ```powershell
 @'
@@ -376,7 +376,7 @@ find /opt/mf-translator -maxdepth 1 -type f -exec chmod 644 {} +
 chmod 600 /opt/mf-translator/.env
 chmod 750 /opt/mf-translator/data
 chmod 600 /opt/mf-translator/data/bot.db 2>/dev/null || true
-'@ | ssh -o BatchMode=yes -o ConnectTimeout=10 root@138.124.229.233 bash -s
+'@ | ssh -o BatchMode=yes -o ConnectTimeout=10 root@48.102.186.191 bash -s
 ```
 
 Ожидаемо: без вывода (кроме возможного `chmod: … No such file` при первом деплое —
@@ -386,7 +386,7 @@ chmod 600 /opt/mf-translator/data/bot.db 2>/dev/null || true
 Проверка прав (read-only):
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 "stat -c '%a %U:%G %n' /opt/mf-translator/.env /opt/mf-translator/data /opt/mf-translator/data/bot.db; find /opt/mf-translator/heroines -type f | head -3 | xargs stat -c '%a %U:%G %n'"
+ssh -o BatchMode=yes root@48.102.186.191 "stat -c '%a %U:%G %n' /opt/mf-translator/.env /opt/mf-translator/data /opt/mf-translator/data/bot.db; find /opt/mf-translator/heroines -type f | head -3 | xargs stat -c '%a %U:%G %n'"
 ```
 
 Ожидаемо: `.env` → `600 trainer:trainer`, `data` → `750`, `bot.db` → `600`,
@@ -400,7 +400,7 @@ ssh -o BatchMode=yes root@138.124.229.233 "stat -c '%a %U:%G %n' /opt/mf-transla
 ### 3.7 Шаг 6. Зависимости
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 "sudo -u trainer -H /opt/mf-translator/.venv/bin/pip install -q -e /opt/mf-translator"
+ssh -o BatchMode=yes root@48.102.186.191 "sudo -u trainer -H /opt/mf-translator/.venv/bin/pip install -q -e /opt/mf-translator"
 ```
 
 Ожидаемо: без вывода при успехе. Если менялся `pyproject.toml`, pip скачает новую
@@ -411,7 +411,7 @@ ssh -o BatchMode=yes root@138.124.229.233 "sudo -u trainer -H /opt/mf-translator
 ### 3.8 Шаг 7. Перезапустить бота
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 "systemctl restart emotion-trainer"
+ssh -o BatchMode=yes root@48.102.186.191 "systemctl restart emotion-trainer"
 ```
 
 Ожидаемо: exit 0. Это единственное место, где сервис останавливается/запускается;
@@ -447,7 +447,7 @@ ssh -o BatchMode=yes root@138.124.229.233 "systemctl restart emotion-trainer"
 распаковки пере-рендерить юнит и применить:
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 "bash /opt/mf-translator/deploy/setup.sh"
+ssh -o BatchMode=yes root@48.102.186.191 "bash /opt/mf-translator/deploy/setup.sh"
 ```
 
 Скрипт идемпотентный: доставит зависимости, перезапишет юнит из шаблона,
@@ -462,7 +462,7 @@ ssh -o BatchMode=yes root@138.124.229.233 "bash /opt/mf-translator/deploy/setup.
 
 | Параметр | Значение |
 |---|---|
-| Хост / IP | `vm1496646.cloud.nuxt.network` / `138.124.229.233` (Германия, nuxt.cloud) |
+| Хост / IP | `vm1496646.cloud.nuxt.network` / `48.102.186.191` (Германия, nuxt.cloud) |
 | ОС / ресурсы | Ubuntu 22.04, 1 vCPU, 2 GB RAM, 30 GB (занято 21%) |
 | Часовой пояс | `Europe/Berlin` (CET): журнал и cron в нём, МСК = CET+2 зимой |
 | Код | `/opt/mf-translator`, владелец `trainer:trainer`, каталог `750` |
@@ -478,26 +478,26 @@ ssh -o BatchMode=yes root@138.124.229.233 "bash /opt/mf-translator/deploy/setup.
 
 ```powershell
 # сервис и юнит
-ssh -o BatchMode=yes root@138.124.229.233 "systemctl is-active emotion-trainer"
-ssh -o BatchMode=yes root@138.124.229.233 "systemctl is-enabled emotion-trainer"
-ssh -o BatchMode=yes root@138.124.229.233 "systemctl show -p ActiveEnterTimestamp -p MainPID --value emotion-trainer"
-ssh -o BatchMode=yes root@138.124.229.233 "systemctl cat emotion-trainer"
+ssh -o BatchMode=yes root@48.102.186.191 "systemctl is-active emotion-trainer"
+ssh -o BatchMode=yes root@48.102.186.191 "systemctl is-enabled emotion-trainer"
+ssh -o BatchMode=yes root@48.102.186.191 "systemctl show -p ActiveEnterTimestamp -p MainPID --value emotion-trainer"
+ssh -o BatchMode=yes root@48.102.186.191 "systemctl cat emotion-trainer"
 
 # журнал (последние строки; фильтр по PID — только текущий процесс, см. §8)
-ssh -o BatchMode=yes root@138.124.229.233 "journalctl -u emotion-trainer -n 30 --no-pager"
+ssh -o BatchMode=yes root@48.102.186.191 "journalctl -u emotion-trainer -n 30 --no-pager"
 
 # файлы
-ssh -o BatchMode=yes root@138.124.229.233 "ls -la /opt/mf-translator /opt/mf-translator/data"
-ssh -o BatchMode=yes root@138.124.229.233 "stat -c '%a %U:%G %s %y %n' /opt/mf-translator/data/bot.db"
-ssh -o BatchMode=yes root@138.124.229.233 "cat /opt/mf-translator/data/bot.pid"
+ssh -o BatchMode=yes root@48.102.186.191 "ls -la /opt/mf-translator /opt/mf-translator/data"
+ssh -o BatchMode=yes root@48.102.186.191 "stat -c '%a %U:%G %s %y %n' /opt/mf-translator/data/bot.db"
+ssh -o BatchMode=yes root@48.102.186.191 "cat /opt/mf-translator/data/bot.pid"
 
 # процессы и база (чтение через read-only URI, без блокировок)
-ssh -o BatchMode=yes root@138.124.229.233 "pgrep -af bot.telegram_bot"
-ssh -o BatchMode=yes root@138.124.229.233 "sqlite3 'file:/opt/mf-translator/data/bot.db?mode=ro' 'select (select count(*) from users), (select count(*) from sessions);'"
+ssh -o BatchMode=yes root@48.102.186.191 "pgrep -af bot.telegram_bot"
+ssh -o BatchMode=yes root@48.102.186.191 "sqlite3 'file:/opt/mf-translator/data/bot.db?mode=ro' 'select (select count(*) from users), (select count(*) from sessions);'"
 
 # бэкапы и ресурсы
-ssh -o BatchMode=yes root@138.124.229.233 "ls -lt /var/backups/emotion-trainer | head -5"
-ssh -o BatchMode=yes root@138.124.229.233 "df -h /; free -m | head -2"
+ssh -o BatchMode=yes root@48.102.186.191 "ls -lt /var/backups/emotion-trainer | head -5"
+ssh -o BatchMode=yes root@48.102.186.191 "df -h /; free -m | head -2"
 ```
 
 ### 4.3 Что запрещено без явного разрешения владельца
@@ -515,7 +515,7 @@ ssh -o BatchMode=yes root@138.124.229.233 "df -h /; free -m | head -2"
 ```powershell
 foreach ($f in 'bot/telegram_bot.py','bot/config.py','scenarios/eva_message/scenario.json','heroines/eva/heroine.json') {
   $local  = (Get-FileHash -Algorithm SHA256 $f).Hash.ToLower()
-  $remote = ((ssh -o BatchMode=yes root@138.124.229.233 "sha256sum /opt/mf-translator/$f") -split ' ')[0]
+  $remote = ((ssh -o BatchMode=yes root@48.102.186.191 "sha256sum /opt/mf-translator/$f") -split ' ')[0]
   "$f : $(if ($local -eq $remote) {'совпадает'} else {'РАСХОДИТСЯ'})"
 }
 ```
@@ -556,7 +556,7 @@ foreach ($f in 'bot/telegram_bot.py','bot/config.py','scenarios/eva_message/scen
 ### 5.1 Ручной бэкап
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 "bash /opt/mf-translator/deploy/backup.sh"
+ssh -o BatchMode=yes root@48.102.186.191 "bash /opt/mf-translator/deploy/backup.sh"
 ```
 
 Что делает `deploy/backup.sh`: `sqlite3 .backup` (консистентный снимок на живой
@@ -579,20 +579,20 @@ ssh -o BatchMode=yes root@138.124.229.233 "bash /opt/mf-translator/deploy/backup
 Если файла нет — поставить (это изменение, только с согласия владельца):
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 "cp /opt/mf-translator/deploy/emotion-trainer-backup.cron /etc/cron.d/emotion-trainer-backup && chmod 644 /etc/cron.d/emotion-trainer-backup"
+ssh -o BatchMode=yes root@48.102.186.191 "cp /opt/mf-translator/deploy/emotion-trainer-backup.cron /etc/cron.d/emotion-trainer-backup && chmod 644 /etc/cron.d/emotion-trainer-backup"
 ```
 
 ### 5.3 Проверить, что бэкапы живые
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 "ls -lt /var/backups/emotion-trainer | head -5"
+ssh -o BatchMode=yes root@48.102.186.191 "ls -lt /var/backups/emotion-trainer | head -5"
 ```
 
 Проверка целостности последнего бэкапа одной командой (read-only: `pragma
 quick_check` ничего не меняет; проверено 10.11.2026 → `ok` и число сессий):
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 'latest=$(ls -t /var/backups/emotion-trainer/bot-*.db | head -1); echo "$latest"; sqlite3 \"$latest\" \"pragma quick_check; select count(*) from sessions;\"'
+ssh -o BatchMode=yes root@48.102.186.191 'latest=$(ls -t /var/backups/emotion-trainer/bot-*.db | head -1); echo "$latest"; sqlite3 \"$latest\" \"pragma quick_check; select count(*) from sessions;\"'
 ```
 
 Ожидаемо: путь к самому свежему бэкапу, `ok` и число сессий. Бэкапы принадлежат
@@ -610,7 +610,7 @@ cp /var/backups/emotion-trainer/bot-2026-11-10_1131.db /opt/mf-translator/data/b
 chown trainer:trainer /opt/mf-translator/data/bot.db
 chmod 600 /opt/mf-translator/data/bot.db
 systemctl start emotion-trainer
-'@ | ssh -o BatchMode=yes -o ConnectTimeout=10 root@138.124.229.233 bash -s
+'@ | ssh -o BatchMode=yes -o ConnectTimeout=10 root@48.102.186.191 bash -s
 ```
 
 Проверка: §8.1/§8.2; дополнительно — что числа в базе соответствуют ожидаемым:
@@ -693,13 +693,13 @@ Git-клона на сервере нет, деплой — архивом. По
    @'
    systemctl is-active emotion-trainer
    cat /opt/mf-translator/data/bot.pid
-   '@ | ssh -o BatchMode=yes root@138.124.229.233 bash -s
+   '@ | ssh -o BatchMode=yes root@48.102.186.191 bash -s
    ```
 
    А в однострочниках, где нужен `grep` с пробелами, экранировать кавычки:
    `grep -E \"Бот запущен|Run polling\"` (проверено).
 3. **SSH уже настроен.** `~/.ssh/id_ed25519` + `known_hosts`; пароль не нужен.
-   Алиаса `trainer` нет — писать `root@138.124.229.233`; добавлять
+   Алиаса `trainer` нет — писать `root@48.102.186.191`; добавлять
    `-o BatchMode=yes -o ConnectTimeout=10`, чтобы команда падала, а не ждала ввода.
 4. **Секреты.** Никогда не печатать `.env` (локальный и `/opt/mf-translator/.env`),
    не читать его «для проверки», не вставлять токены в документы/отчёты/команды.
@@ -739,15 +739,15 @@ Git-клона на сервере нет, деплой — архивом. По
 
 ```powershell
 # 1) сервис поднялся
-ssh -o BatchMode=yes root@138.124.229.233 'systemctl is-active emotion-trainer'
+ssh -o BatchMode=yes root@48.102.186.191 'systemctl is-active emotion-trainer'
 # ожидаемо: active
 
 # 2) текущий процесс: те же PID в systemd и в bot.pid
-ssh -o BatchMode=yes root@138.124.229.233 'main=$(systemctl show -p MainPID --value emotion-trainer); pid=$(cat /opt/mf-translator/data/bot.pid); echo MainPID=$main bot.pid=$pid; test $main = $pid && echo PID-совпал'
+ssh -o BatchMode=yes root@48.102.186.191 'main=$(systemctl show -p MainPID --value emotion-trainer); pid=$(cat /opt/mf-translator/data/bot.pid); echo MainPID=$main bot.pid=$pid; test $main = $pid && echo PID-совпал'
 # ожидаемо: «MainPID=… bot.pid=…» и «PID-совпал»
 
 # 3) журнал старта текущего процесса
-ssh -o BatchMode=yes root@138.124.229.233 'main=$(systemctl show -p MainPID --value emotion-trainer); journalctl -u emotion-trainer _PID=$main --no-pager | grep -E \"Бот запущен|Run polling|Traceback|Conflict\"'
+ssh -o BatchMode=yes root@48.102.186.191 'main=$(systemctl show -p MainPID --value emotion-trainer); journalctl -u emotion-trainer _PID=$main --no-pager | grep -E \"Бот запущен|Run polling|Traceback|Conflict\"'
 # ожидаемо: «Бот запущен, сценарий: …» и «Run polling for bot @…»
 # НЕ должно быть строк Traceback/Conflict
 ```
@@ -780,7 +780,7 @@ echo "$logs" | grep -q "Run polling"
 ! echo "$logs" | grep -q "Traceback"
 ! echo "$logs" | grep -q "Conflict"
 echo "OK: active, PID $main, Бот запущен + Run polling, без Traceback/Conflict"
-'@ | ssh -o BatchMode=yes -o ConnectTimeout=10 root@138.124.229.233 bash -s
+'@ | ssh -o BatchMode=yes -o ConnectTimeout=10 root@48.102.186.191 bash -s
 ```
 
 Трактовка: `OK: …` — деплой прошёл и бот жив; любая другая строка/exit ≠ 0 —
@@ -790,7 +790,7 @@ echo "OK: active, PID $main, Бот запущен + Run polling, без Traceba
 ### 8.3 Быстрая «жив ли» без строгого скрипта
 
 ```powershell
-ssh -o BatchMode=yes root@138.124.229.233 'systemctl is-active emotion-trainer; systemctl show -p ActiveEnterTimestamp --value emotion-trainer; journalctl -u emotion-trainer -n 3 --no-pager'
+ssh -o BatchMode=yes root@48.102.186.191 'systemctl is-active emotion-trainer; systemctl show -p ActiveEnterTimestamp --value emotion-trainer; journalctl -u emotion-trainer -n 3 --no-pager'
 ```
 
 Ожидаемо: `active`, серверное время последнего старта, 3 последние строки журнала
@@ -852,7 +852,7 @@ Traceback/Conflict в журнале текущего процесса нет.
    либо не увидеть строки старта, либо испугаться старой ошибки. В §8 — фильтр
    `_PID` текущего процесса.
 6. **Алиас `trainer`** из §0.5 не создан в `~/.ssh/config`; все команды — с полным
-   `root@138.124.229.233`. Не ошибка, но при копировании примеров с алиасом
+   `root@48.102.186.191`. Не ошибка, но при копировании примеров с алиасом
    команды не сработают.
 7. **Слэш-команда `/deploy` (`.claude/commands/deploy.md`) повторяет те же два
    места:** в её `chmod` тоже нет `heroines`, а проверка после restart —
@@ -878,7 +878,7 @@ Traceback/Conflict в журнале текущего процесса нет.
   → «Бот не запущен. PID-файл: 24444.» (устаревший pid-файл, безвреден)
 
 # прод (read-only)
-ssh -o BatchMode=yes root@138.124.229.233 "systemctl is-active emotion-trainer"
+ssh -o BatchMode=yes root@48.102.186.191 "systemctl is-active emotion-trainer"
   → active (enabled; старт 10.11 11:32:17 CET, MainPID 194620 = data/bot.pid)
 journalctl -u emotion-trainer _PID=194620 | grep -E "Бот запущен|Run polling"
   → «Бот запущен, сценарий: Первое сообщение»

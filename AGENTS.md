@@ -26,7 +26,7 @@ Telegram-бот, в котором пользователь переписыва
   `git push` — никогда без просьбы.
 - **Любое изменение кода, сценариев или конфигурации деплоится на VPS и перезапускает
   бота.** «Локально работает» не значит «работает у пользователей»: боевой сервер —
-  `root@138.124.229.233`, код в `/opt/mf-translator`, сервис `emotion-trainer`.
+  `root@48.102.186.191`, код в `/opt/mf-translator`, сервис `emotion-trainer`.
   Порядок обязателен: тесты → архив → `chown` → `pip install -e .` →
   `systemctl restart emotion-trainer` → проверка `systemctl is-active` и
   `journalctl -u emotion-trainer` (`Бот запущен`, `Run polling`, без `Traceback`

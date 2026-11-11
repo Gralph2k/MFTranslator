@@ -27,7 +27,7 @@
   aiogram 3, SQLite, DeepSeek API, Pillow. Точка входа бота —
   [bot/telegram_bot.py](../../bot/telegram_bot.py), игра в терминале —
   [bot/cli.py](../../bot/cli.py).
-- **Прод работает.** `root@138.124.229.233`, код в `/opt/mf-translator`, сервис
+- **Прод работает.** `root@48.102.186.191`, код в `/opt/mf-translator`, сервис
   systemd `emotion-trainer` (`active`), long polling, бот **@gralmy_bot**
   («Чего хотят женщины»). Последний деплой — **10.11.2026, 13:32:17 МСК**
   (серверное `11:32:17 CET`). Подробности и хеши — §2.
@@ -489,7 +489,7 @@ energy 0.5`, кнопки «Пройти заново» нет (только «�
 .\.venv\Scripts\python.exe -m bot.cli --provider demo --scenario first_message
 
 # 2. Прод — только read-only, без деплоя без просьбы владельца
-ssh -o BatchMode=yes root@138.124.229.233 "systemctl is-active emotion-trainer; systemctl show emotion-trainer -p ActiveEnterTimestamp --value; journalctl -u emotion-trainer -n 5 --no-pager"
+ssh -o BatchMode=yes root@48.102.186.191 "systemctl is-active emotion-trainer; systemctl show emotion-trainer -p ActiveEnterTimestamp --value; journalctl -u emotion-trainer -n 5 --no-pager"
 
 # 3. Что читать по порядку
 #    CLAUDE.md → docs/migration/README.md → этот файл → docs/migration/deploy-and-testing.md

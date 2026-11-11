@@ -103,7 +103,7 @@ docs/migration/                пакет передачи в Claude Code: ст�
 ## Жёсткие правила
 
 1. **Любое изменение кода, сценариев или конфигурации деплоится на VPS и
-   перезапускает бота.** Сервер: `root@138.124.229.233`, код в `/opt/mf-translator`,
+   перезапускает бота.** Сервер: `root@48.102.186.191`, код в `/opt/mf-translator`,
    сервис `emotion-trainer`. Порядок строго по §7 `deploy/DEPLOY.md`: тесты →
    бэкап `deploy/backup.sh` → архив → `scp` → `chown`/`chmod` → `pip install -e .` →
    `systemctl restart emotion-trainer` → `systemctl is-active` и `journalctl`
