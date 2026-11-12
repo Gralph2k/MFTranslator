@@ -1,4 +1,4 @@
-"""Сценарий «Первое свидание» Евы: вживую, винный бар с живой музыкой.
+"""Сценарий «Первое свидание» Евы: вживую, кафе, четверг, вечер.
 
 Свидание Евы — не копия свидания Веры: она не «вежливая и настороженная»,
 а быстрая и ироничная, и трудность не в анкете, а в равенстве — счёт, темп
@@ -51,7 +51,8 @@ def test_slowing_her_down_is_the_deepest_trap():
 def test_wrap_up_is_her_own():
     reasons = " ".join(_scenario().wrap_up_reasons).lower()
 
-    assert "мотоцикл" in reasons or "промилле" in reasons
+    # Причина — её собственная жизнь: съёмка, закрытие кафе, собранный рюкзак.
+    assert "съёмка" in reasons or "кафе" in reasons
     assert _scenario().wrap_up_at == 3
 
 
@@ -68,13 +69,14 @@ def test_rubric_is_about_moves_not_personality():
     ]
 
 
-def test_prompt_frame_is_the_wine_bar():
+def test_prompt_frame_is_the_cafe():
     scenario = _scenario()
     state = PersonaState.from_mapping(scenario.initial_state)
     prompt = persona_system_prompt(scenario, state)
 
     assert "Ева" in prompt
-    assert "винный бар" in prompt
+    assert "кафе" in prompt
+    assert "винный бар" not in prompt
     assert "Вера" not in prompt
     # speech_extra канала вживую подмешан к голосу героини.
     assert "Вживую Ева живее" in prompt
