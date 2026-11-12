@@ -9,12 +9,17 @@
 **Стиль — фотореализм**, в отличие от аниме-серии Веры и Ани. Это осознанно:
 разные героини, разные наборы. Не смешивать референсы и стили.
 
+**Референс:** `scenarios/first_message/eva/images/eva_base.jpg` — утверждённое лицо
+Евы. Прикрепляется к каждому кадру, включая `profile_1.jpg`. Важно: на референсе
+Ева в тёмно-зелёной футболке — эту футболку в кадры не переносить (см. «Одежда и
+цвет по кадрам»), а лицо не старить: на референсе оно читается старше 26.
+
 ## Четыре кадра
 
 | файл | сцена | что должно читаться |
 |---|---|---|
 | `profile_1.jpg` | съёмочная локация на крыше, золотой час, камера в руках | работа и «я не товар»: прямой уверенный взгляд |
-| `profile_2.jpg` | мотоцикл на загородной дороге, закат, шлем в руке | скорость и свобода |
+| `profile_2.jpg` | ночной город, Ева сидит на мотоцикле, шлем на руле | скорость и свобода |
 | `profile_3.jpg` | горная дорога или побережье, рюкзак, ветер | поездки без расписания |
 | `profile_4.jpg` | ресторан, тёплый вечерний свет, бокал | вкус, вечер, «чего ищет» |
 
@@ -39,6 +44,11 @@
 | стиль | фотореализм, естественная кожа с порами, 50 мм, мягкий свет, приглушённая тёплая палитра, кадр как из жизни, а не из рекламы |
 | размер | 1:1, 1024×1024, по пояс или крупнее, лицо в фокусе |
 
+Отдельно про возраст: модель регулярно старит Еву — референс это только усугубляет.
+В каждом промпте возраст идёт с усилителем: «26, выглядит моложе своих лет», свежая
+гладкая кожа, без глубоких носогубных складок и «гусиных лапок». Кадр, где Ева
+выглядит старше 27, — брак, перегенерировать (см. «Если лицо «плывёт»»).
+
 ## Одежда и цвет по кадрам
 
 Четыре кадра стоят в анкете рядом, поэтому одинаковый наряд и одинаковый цвет читаются
@@ -46,23 +56,27 @@
 
 | файл | одежда | доминирующий цвет |
 |---|---|---|
-| `profile_1.jpg` | свободная льняная рубашка с подвёрнутыми рукавами поверх белой майки, тёмно-синие джинсы | глубокий зелёный |
-| `profile_2.jpg` | кожаная косуха поверх чёрной футболки, выцветшие чёрные джинсы, потёртые коричневые ботинки | петроль-синий (глубокий сине-зелёный) |
+| `profile_1.jpg` | свободная льняная рубашка с подвёрнутыми рукавами поверх белой майки, тёмно-синие джинсы | терракотовый (тёплый рыже-красный) |
+| `profile_2.jpg` | кожаная косуха поверх белой футболки, выцветшие чёрные джинсы, потёртые коричневые ботинки | глубокий синий (navy) |
 | `profile_3.jpg` | лёгкая полевая куртка поверх белой футболки, хаки-брюки, трекинговые ботинки | горчичный (тёплый жёлтый) |
 | `profile_4.jpg` | шёлковое платье-комбинация, светлый кардиган на плечах | бордо (винный) |
 
-Цвета не повторяются: зелёный → петроль-синий → горчичный → бордо. Одежда простая, по
-погоде и по сцене, без логотипов, надписей и «брендов»; ничего не расстёгнуто ради
-эффекта и ничего не подчёркивает тело.
+Цвета не повторяются: терракотовый → глубокий синий → горчичный → бордо.
+**Зелёный запрещён во всех кадрах**: референс снят в тёмно-зелёной футболке, и без
+явного запрета модель тащит зелень в каждый наряд. Одежда простая, по погоде и по
+сцене, без логотипов, надписей и «брендов»; ничего не расстёгнуто ради эффекта и
+ничего не подчёркивает тело.
 
 ## Как работать (порядок важен)
 
-1. **`profile_1.jpg` создаётся с нуля.** Референса ещё нет: лицо Евы рождается
-   здесь. Сгенерируйте 3–4 варианта из шага 2.1, выберите один — он станет
-   эталоном. Главное фото анкеты утверждается первым.
-2. **`profile_2..4.jpg` — только с референсом.** Прикрепляйте утверждённый
-   `profile_1.jpg` как изображение-референс и просите сохранить лицо. Меняются
-   сцена, поза, одежда и выражение.
+1. **Референс уже есть: `eva_base.jpg`.** Лицо Евы утверждено, с нуля ничего не
+   генерируется: референс прикрепляется ко всем четырём кадрам, включая
+   `profile_1.jpg`. Просите сохранить лицо; меняются сцена, поза, одежда и
+   выражение.
+2. **Зелёную футболку референса в кадры не переносить.** На `eva_base.jpg` Ева в
+   тёмно-зеленой футболке: без явного запрета модель копирует её в каждый наряд.
+   В каждом промпте есть фраза «одежду брать из промпта, не из референса» — не
+   убирать её.
 3. **Не смешивайте с Верой и Аней.** Не прикрепляйте `scenarios/first_date/vera/images/*`
    и `scenarios/friday_evening/anya/images/*`: модель подтянет медно-каштановое каре,
    оливковую рубашку и аниме-стиль.
@@ -76,12 +90,15 @@
 
 ## Шаг 1. Блок идентичности
 
-Этот кусок идёт в начало каждого промпта. Для `profile_1.jpg` — без фразы про
-референс, для остальных — с ней. Повторять дословно: длинные вольные пересказы
-модель понимает как разрешение менять внешность.
+Этот кусок идёт в начало каждого промпта, сразу после фразы про референс — она
+теперь одинакова для всех четырёх кадров, включая `profile_1.jpg`. Повторять
+дословно: длинные вольные пересказы модель понимает как разрешение менять
+внешность.
 
 ```
-A photorealistic portrait of one woman: 26 years old, an oval face with high cheekbones
+A photorealistic portrait of one woman: 26 years old and looking young for her age —
+a fresh, youthful face, smooth firm skin, no deep nasolabial folds or crow's feet.
+An oval face with high cheekbones
 and a soft but defined jawline, light warm skin with a light scatter of fine freckles
 across the nose bridge and upper cheeks. Green-hazel almond-shaped eyes with a direct,
 level gaze, soft blonde eyebrows one or two shades darker than her hair, a small
@@ -107,7 +124,13 @@ watermark, no logo, no other people in focus.
 Это «работа и о себе» — кадр должен читаться как день из её жизни.
 
 ```
-A photorealistic portrait of one woman: 26 years old, an oval face with high cheekbones
+Using the attached portrait as the reference, keep the exact same woman and the
+exact same facial features. Do not redraw her face; she is 26 and looks young for
+her age: smooth fresh skin, no deep lines.
+
+A photorealistic portrait of one woman: 26 years old and looking young for her age —
+a fresh, youthful face, smooth firm skin, no deep nasolabial folds or crow's feet.
+An oval face with high cheekbones
 and a soft but defined jawline, light warm skin with a light scatter of fine freckles
 across the nose bridge and upper cheeks. Green-hazel almond-shaped eyes with a direct,
 level gaze, soft blonde eyebrows one or two shades darker than her hair, a small
@@ -120,7 +143,7 @@ retouching. Athletic, lean build.
 She is a freelance photographer at work: standing on a city rooftop in the late
 afternoon, a professional mirrorless camera held loosely in both hands at chest level,
 one hand resting on the lens, the camera strap over her shoulder. She wears a loose
-forest-green linen shirt with the sleeves rolled to the elbow, a white tank top showing
+terracotta (warm rust-orange) linen shirt with the sleeves rolled to the elbow, a white tank top showing
 at the open collar, and dark indigo jeans. She has just lowered the camera and looks
 straight into the portrait lens. Slight three-quarter turn of the shoulders, head facing
 the viewer. Head-and-shoulders to chest-up framing, centred.
@@ -147,6 +170,8 @@ the small silver hoop in the left ear.
 - не пластиковая кожа: без «гламурного» ретуширования, без студийного глянца,
   без идеальных кукольных черт;
 - не менять возраст: 26, а не 19 и не 35; без детской округлости лица;
+- не старить: без глубоких носогубных складок, «гусиных лапок», тяжёлого зрелого
+  лица и усталого взгляда — Ева выглядит моложе своих лет;
 - не менять веснушки, цвет и разрез глаз, форму бровей, серьгу в левом ухе;
 - не менять причёску: низкий свободный хвост, пряди у лица, светлый медовый блонд;
 - камера в руках должна выглядеть как камера: ровный корпус, объектив, ремень; кисти
@@ -158,77 +183,94 @@ the small silver hoop in the left ear.
   «с обложки».
 
 **Что проверить после генерации:**
-- лицо подходит как эталон: форма лица, веснушки, зелёно-карие глаза, брови,
-  губы, серьга в левом ухе, светлый блонд в низком хвосте;
+- лицо совпадает с `eva_base.jpg`: форма лица, веснушки, зелёно-карие глаза,
+  брови, губы, серьга в левом ухе, светлый блонд в низком хвосте;
 - возраст читается как 26, кожа живая, веснушки лёгкие, а не декоративные;
 - камера читается как фотоаппарат, руки естественные, ремень не «врос» в плечо;
 - взгляд уверенный и спокойный, без кокетства и без пустой приветливой улыбки;
 - фон — крыша и золотой час, размыт, без текста и чужих людей;
 - кадр годится как главное фото анкеты: лицо крупно, макушка и плечи не обрезаны;
-- наряд и цвет свои: зелёная рубашка, а не чёрная кожа и не нейтральный клон.
+- наряд и цвет свои: терракотовая рубашка, а не зелёная футболка референса, не
+  чёрная кожа и не нейтральный клон.
 
-### 2. Мотоцикл — `profile_2.jpg`
+### 2. Мотоцикл в ночном городе — `profile_2.jpg`
 
-**Назначение:** вторая сторона анкеты — скорость и свобода. Она ездит сама, а не
-сидит пассажиркой. Кадр должен читаться как «выходные», а не как реклама мотоцикла.
+**Назначение:** вторая сторона анкеты — скорость и свобода, но в ритме города:
+вечер, она приехала сама и сидит на байке без спешки. Кадр должен читаться как
+«её вечер», а не как реклама мотоцикла.
 
 ```
 Using the attached portrait as the reference, keep the exact same woman and change
 only the scene, the pose, the clothing and her expression. Do not redraw her face:
-keep the same facial features as the reference.
+keep the same facial features as the reference. She is 26 and looks young for her
+age: smooth fresh skin, no deep lines.
 
-The same woman as in the attached reference image: 26 years old, an oval face with high
+The same woman as in the attached reference image: 26 years old, looking young for
+her age with smooth fresh skin and no deep lines, an oval face with high
 cheekbones and a soft but defined jawline, light warm skin with a light scatter of fine
 freckles across the nose bridge and upper cheeks, green-hazel almond-shaped eyes, soft
 blonde eyebrows one or two shades darker than her hair, a small straight nose, natural
 full lips, a single small silver hoop earring in her left ear, light warm honey-blonde
 hair in a loose low ponytail, almost no makeup, real skin texture.
 
-She stands next to a classic black motorcycle on a quiet country road at sunset, a
-helmet held in one hand at her hip. She wears a fitted petrol-blue (deep blue-green)
-leather biker jacket over a plain black t-shirt, faded black jeans and worn brown
-leather boots. Slight three-quarter turn of the body, head facing the viewer.
+She sits on a classic black motorcycle parked on a quiet city street at night, in a
+relaxed, easy pose: sitting side-saddle-leaning on the seat with one boot on the
+pavement, one forearm resting casually on the tank, shoulders loose and comfortable.
+The helmet is not on her head: it hangs on the handlebar next to the mirror. She
+wears a deep navy-blue leather biker jacket over a plain white t-shirt, faded black
+jeans and worn brown leather boots. Head turned to the viewer, waist-up framing, the
+motorcycle clearly readable beside her.
 
-Expression: a small confident half-smile, eyes bright and direct. She looks like she
-has just stopped for a moment and is enjoying the evening. Not shouting, not posing
-like a biker poster, not a sexualized pose.
+Expression: a small confident half-smile, eyes bright and direct, relaxed — like the
+evening went well. Not shouting, not posing like a biker poster, not a sexualized
+pose.
 
-Setting: a narrow asphalt road between empty golden fields at sunset, a blurred line of
-trees and a low sun behind her, warm haze, long soft shadows. The motorcycle is a real
-classic road bike, softly out of focus behind her shoulder. No readable license plate,
-no signs, no text, no other vehicles or people. Warm side light on her face, natural
-shadows.
+Setting: a quiet city street at night. Behind her, softly out of focus: warm lit
+windows, a muted neon glow in blue and pink, one street lantern above, light haze,
+asphalt reflecting the lights. Cool night tones with a warm accent light on her face.
+The motorcycle is a real classic road bike: wheels, tank, handlebar and exhaust read
+clearly. No readable license plate, no signs, no text, no other people or cars in
+focus.
 
-Photorealistic photograph, natural skin texture, no beauty retouching, 50mm lens at eye
-level, shallow depth of field, muted warm color grading, candid editorial feel. 1:1
-square, 1024×1024. No text, no watermark, no logo, no other people in focus.
+Photorealistic photograph, natural skin texture, no beauty retouching, 50mm lens at
+eye level, shallow depth of field, cool night color grading with warm lantern accents
+on the face, candid editorial feel. 1:1 square, 1024×1024. No text, no watermark, no
+logo, no other people in focus.
 ```
 
 **Негативные ограничения:**
-- не менять лицо; в динамике и с новым светом модель чаще всего «перерисовывает»
-  черты — сверять с `profile_1.jpg`;
-- не менять хвост и блонд: волосы остаются светлыми, ветер может растрёпать пряди,
-  но не перекрасить их в русый или тёмный;
-- не сексуализировать: никакой позы «лёжа на баке», никакого ракурса снизу на бёдра,
-  никакой расстёгнутой куртки, никакого «горящего» взгляда в камеру; она ездит,
-  а не соблазняет;
-- мотоцикл должен быть настоящим байком: колёса, бак, руль, выхлоп читаются;
-  без надписей, наклеек и номеров;
-- шлем в руке, а не на голове и не на земле; рука держит его правдоподобно;
-- никакого текста на одежде, номерах, вывесках и в фоне;
-- не рекламный кадр: без идеального заката «как в кино» и без студийного света;
-- не копировать одежду и фон референса: зелёная рубашка и крыша остаются только
-  в `profile_1.jpg`.
+- не менять лицо; ночной свет и новая поза — как раз условия, где модель
+  «перерисовывает» черты, — сверять с `eva_base.jpg`;
+- не старить: ночное освещение легко добавляет годы — «26 и моложе на вид»,
+  гладкая свежая кожа, без глубоких складок;
+- не менять хвост и блонд: волосы остаются светлыми, ночь не перекрашивает их
+  в русый или тёмный;
+- не сексуализировать: никакой позы «лёжа на баке», никакой обвивки байком,
+  никакого ракурса снизу на бёдра, никакой расстёгнутой куртки; она сидит
+  свободно, а не соблазняет;
+- шлем на руле: не на голове, не на земле, не в руке; висит у зеркала и читается
+  как шлем;
+- мотоцикл настоящий: колёса, бак, руль, выхлоп читаются; без надписей, наклеек
+  и номеров;
+- никакого текста: вывески, витрины с буквами, неоновые надписи, номера,
+  водяные знаки;
+- не рекламный кадр: без глянцевого «кинематографичного» неона и студийного
+  света;
+- не копировать референс: зелёная футболка `eva_base.jpg` и терракотовая рубашка
+  `profile_1.jpg` остаются вне этого кадра.
 
 **Что проверить после генерации:**
-- лицо совпадает с `profile_1.jpg`: глаза, брови, губы, веснушки, серьга в левом ухе;
-- хвост и цвет волос не «поплыли»;
-- кадр читается как «она и мотоцикл», а не как «девушка-модель с байком»;
-- поза без пошлости: акцент на лице и свободе, не на теле;
-- мотоцикл без надписей и номеров, не обрезан так, что непонятен;
-- руки и пальцы целые, шлем не сливается с рукой;
-- свет тёплый, лицо читаемо, фон не перетягивает;
-- наряд петроль-синий и не повторяет другие кадры.
+- лицо совпадает с `eva_base.jpg`: глаза, брови, губы, веснушки, серьга в левом
+  ухе;
+- возраст читается как 26 или моложе — ночной свет не «добавил» лет;
+- Ева сидит на мотоцикле, поза свободная: нога на асфальте, предплечье на баке,
+  плечи расслаблены;
+- шлем висит на руле, не на голове; читается как шлем, а не как сгусток теней;
+- кадр читается как «она и её вечер в городе», а не «девушка-модель с байком»;
+- мотоцикл без надписей и номеров; фон — размытый ночной город без букв;
+- руки и пальцы целые; лицо читаемо на тёплом акценте и не проваливается в
+  синеву;
+- наряд глубокий синий (navy), зелени нет, остальные кадры не повторяются.
 
 ### 3. Путешествие — `profile_3.jpg`
 
@@ -240,7 +282,8 @@ Using the attached portrait as the reference, keep the exact same woman and chan
 only the scene, the pose, the clothing and her expression. Do not redraw her face:
 keep the same facial features as the reference.
 
-The same woman as in the attached reference image: 26 years old, an oval face with high
+The same woman as in the attached reference image: 26 years old, looking young for
+her age with smooth fresh skin and no deep lines, an oval face with high
 cheekbones and a soft but defined jawline, light warm skin with a light scatter of fine
 freckles across the nose bridge and upper cheeks, green-hazel almond-shaped eyes, soft
 blonde eyebrows one or two shades darker than her hair, a small straight nose, natural
@@ -279,11 +322,12 @@ in focus.
 - рюкзак и куртка — обычные, без брендов и надписей; одежда по погоде, не
   сексуализированная;
 - не фотореализм → только фотореализм: без рисованных гор и «открыточного» HDR;
-- не копировать одежду и фон референса: зелёная рубашка и крыша остаются только
+- не копировать одежду и фон референса: зелёная футболка `eva_base.jpg` не
+  переносится ни в один кадр; терракотовая рубашка и крыша остаются только
   в `profile_1.jpg`.
 
 **Что проверить после генерации:**
-- лицо совпадает с `profile_1.jpg`; веснушки и серьга на месте;
+- лицо совпадает с `eva_base.jpg`; веснушки и серьга на месте;
 - кадр читается как поездка и характер, а не как «стоит на фоне гор»;
 - волосы растрёпаны ветром, но хвост и светлый блонд читаются;
 - рюкзак, куртка и хаки-брюки без брендов и текста;
@@ -304,7 +348,8 @@ Using the attached portrait as the reference, keep the exact same woman and chan
 only the scene, the pose, the clothing and her expression. Do not redraw her face:
 keep the same facial features as the reference.
 
-The same woman as in the attached reference image: 26 years old, an oval face with high
+The same woman as in the attached reference image: 26 years old, looking young for
+her age with smooth fresh skin and no deep lines, an oval face with high
 cheekbones and a soft but defined jawline, light warm skin with a light scatter of fine
 freckles across the nose bridge and upper cheeks, green-hazel almond-shaped eyes, soft
 blonde eyebrows one or two shades darker than her hair, a small straight nose, natural
@@ -343,11 +388,12 @@ editorial feel. 1:1 square, 1024×1024. No text, no watermark, no logo.
 - не глянцевый ресторанный кадр для журнала: без студийного света, без идеальной
   сервировки;
 - платье и кардиган без брендов и надписей;
-- не копировать одежду и фон референса: зелёная рубашка и крыша остаются только
+- не копировать одежду и фон референса: зелёная футболка `eva_base.jpg` не
+  переносится ни в один кадр; терракотовая рубашка и крыша остаются только
   в `profile_1.jpg`.
 
 **Что проверить после генерации:**
-- лицо совпадает с `profile_1.jpg`; глаза, брови, губы, веснушки, серьга на месте;
+- лицо совпадает с `eva_base.jpg`; глаза, брови, губы, веснушки, серьга на месте;
 - улыбка живая и тёплая, а не загадочная и не пьяная;
 - кадр читается как вечер, а не как реклама вина;
 - бокал один, вино тёмное, без бутылок и логотипов;
@@ -364,8 +410,12 @@ editorial feel. 1:1 square, 1024×1024. No text, no watermark, no logo.
   3D, живописи и «пластикового» глянца.
 - Идентичность (лицо, веснушки, глаза, светлый блонд и хвост, серьга, возраст,
   «почти без макияжа») не меняется; меняются сцена, поза, одежда и выражение.
-- Одежда в каждом кадре своя и своего цвета: зелёный → петроль-синий → горчичный →
-  бордо. Четыре одинаковых наряда или цвета = четыре одинаковых фото.
+- Одежда в каждом кадре своя и своего цвета: терракотовый → глубокий синий →
+  горчичный → бордо. Четыре одинаковых наряда или цвета = четыре одинаковых фото.
+- Зелёный запрещён во всех кадрах: референс снят в тёмно-зелёной футболке, и без
+  явного запрета модель тянет зелень в каждый наряд.
+- Возраст: 26 и моложе на вид в каждом кадре; без глубоких морщин, носогубных
+  складок и «усталого» зрелого лица — модель старит Еву чаще, чем меняет лицо.
 - Ева — не модель и не «девушка с обложки»: расслабленная уверенность, ирония,
   живое лицо; не кокетство и не постановочная улыбка.
 - Запрещено: читаемый текст, вывески, меню, номера, логотипы, бренды, водяные
@@ -376,15 +426,17 @@ editorial feel. 1:1 square, 1024×1024. No text, no watermark, no logo.
 
 ## Если лицо «плывёт»
 
-- Прикрепите `profile_1.jpg` ещё раз и добавьте: `Do not redraw the face. Keep the
+- Прикрепите `eva_base.jpg` ещё раз и добавьте: `Do not redraw the face. Keep the
   exact same facial features as the reference; only the scene, the pose, the clothing
   and the expression may change.`
+- Если Ева вышла старше своих лет, добавьте: `She is 26 and looks young for her
+  age. Do not age her face: smooth fresh skin, no deep lines.`
 - Если после смены сцены уехало лицо, сократите описание сцены до одной-двух фраз:
   длинные описания модель понимает как разрешение переписать человека.
 - Сгенерируйте 3–4 варианта и выберите тот, где совпадают форма глаз, линия бровей,
   губы, веснушки и серьга в левом ухе.
 - Если поплыли веснушки, блонд стал русым или уехал хвост — вернитесь к
-  `profile_1.jpg`: это якоря, по которым видно, что кадр остался тем же человеком.
+  `eva_base.jpg`: это якоря, по которым видно, что кадр остался тем же человеком.
 - Если модель тащит одежду или фон из референса, добавьте: `Keep the face and hair
   from the reference; take the outfit and the background from the prompt, do not copy
   them from the reference image.`
@@ -411,6 +463,6 @@ scenarios/first_message/eva/images/profile_4.jpg
 | файл | подпись в анкете |
 |---|---|
 | `profile_1.jpg` | Снимаю людей — это моя работа и мой способ смотреть |
-| `profile_2.jpg` | Выходные: мотоцикл и трасса без плана |
+| `profile_2.jpg` | Выходные: мотоцикл и ночной город |
 | `profile_3.jpg` | Поездки, где нет расписания |
 | `profile_4.jpg` | Ищу того, кто поедет рядом, а не того, кого надо тянуть за собой |
