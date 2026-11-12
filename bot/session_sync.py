@@ -21,7 +21,7 @@ from pathlib import Path
 from .config import load_settings
 
 ROOT = Path(__file__).resolve().parent.parent
-SSH_TARGET = os.getenv("SESSIONS_SSH", "root@48.102.186.191")
+SSH_TARGET = os.getenv("SESSIONS_SSH", "root@176.124.220.117")
 REMOTE_PROJECT = "/opt/mf-translator"
 REMOTE_DB = "data/bot.db"
 DEFAULT_TTL = 120
