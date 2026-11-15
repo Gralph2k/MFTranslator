@@ -112,33 +112,35 @@ class FakeMessage:
     def __init__(self, text: str, user_id: int = 1) -> None:
         self.text = text
         self.from_user = SimpleNamespace(id=user_id)
+        self.bot = None  # _deliver_debrief передаёт target.bot в отчёт владельцу
         self.sent: list[str] = []
 
     async def answer(self, text: str, **kwargs) -> None:
         self.sent.append(text)
 
 
-async def test_start_opens_a_random_heroine(store, monkeypatch):
-    """/start запускает случайную героиню, а не первый сценарий по порядку."""
+async def test_start_shows_landing_without_scenario(store, monkeypatch):
+    """/start — лендинг бота: интро и меню, сценарий не запускается сам."""
     trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
     monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
-    monkeypatch.setattr(
-        telegram_bot, "random_heroine", lambda last=None: heroines()[0]
-    )
 
     message = FakeMessage("/start")
     await telegram_bot.cmd_start(message)
 
-    session = trainer.get_session(1)
-    assert session is not None
-    assert session.scenario.id == "first_message/vera"
+    assert trainer.get_session(1) is None
     assert any("тренажёр" in text.lower() for text in message.sent)
+    assert any("Проверка анкеты" in text for text in message.sent)
 
 
-async def test_start_anti_repeats_the_last_heroine(store, monkeypatch):
+async def test_restart_anti_repeats_the_last_heroine(store, monkeypatch):
     """Если прошлый разговор был с Верой, случайный выбор её исключает."""
     trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
     trainer.start_session(telegram_id=1, scenario_id="first_message/vera")
+    # Закрываем разговор и «перезапускаем процесс»: ни активной сцены в базе,
+    # ни копии в памяти — иначе /restart просто повторил бы ту же сцену.
+    stored = store.get_active_session(store.ensure_user(1))
+    store.save_session(stored.id, stored.state, stored.history, stored.user_turns, finished=True)
+    trainer.sessions.pop(1, None)
 
     seen: dict[str, str | None] = {}
 
@@ -149,7 +151,7 @@ async def test_start_anti_repeats_the_last_heroine(store, monkeypatch):
     monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
     monkeypatch.setattr(telegram_bot, "random_heroine", pick)
 
-    await telegram_bot.cmd_start(FakeMessage("/start"))
+    await telegram_bot.cmd_restart(FakeMessage("/restart"))
 
     assert seen["last"] == "vera"
     session = trainer.get_session(1)
@@ -188,6 +190,43 @@ async def test_debrief_arrives_as_soon_as_turns_run_out(store, monkeypatch):
     assert session.finished is True
     assert any("Разбор" in text for text in message.sent)
     assert store.last_debrief(store.ensure_user(1)) is not None
+
+
+async def test_finished_scenario_is_reported_to_owner(store, monkeypatch):
+    """Каждый завершённый сценарий уходит владельцу: переписка + разбор."""
+    llm = FakeLLM(["Ладно.", json.dumps({"trust": 0.5}), DEBRIEF])
+    trainer = Trainer(DialogueEngine(llm), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    reports: list[str] = []
+    monkeypatch.setattr(
+        telegram_bot, "_notify_owner", lambda bot, tr, text: reports.append(text)
+    )
+
+    session = trainer.start_session(telegram_id=77)
+    session.user_turns = session.scenario.turn_limit - 1
+    await telegram_bot.on_text(FakeMessage("Я рядом.", user_id=77))
+
+    assert len(reports) == 1
+    assert f"tg 77" in reports[0]
+    assert "Переписка:" in reports[0] and "Он: Я рядом." in reports[0]
+    assert "Разбор:" in reports[0] and "Итог:" in reports[0]
+
+
+async def test_owner_report_is_not_sent_without_debrief(store, monkeypatch):
+    """Без разбора отчёта нет: провал debrief не дублирует владельцу пустоту."""
+    llm = FakeLLM(["Ладно.", json.dumps({"trust": 0.5})])
+    trainer = Trainer(DialogueEngine(llm), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    reports: list[str] = []
+    monkeypatch.setattr(
+        telegram_bot, "_notify_owner", lambda bot, tr, text: reports.append(text)
+    )
+
+    session = trainer.start_session(telegram_id=1)
+    session.user_turns = session.scenario.turn_limit - 1
+    await telegram_bot.on_text(FakeMessage("Я рядом."))
+
+    assert reports == []
 
 
 async def test_finish_does_not_repeat_an_automatic_debrief(store, monkeypatch):

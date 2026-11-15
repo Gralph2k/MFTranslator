@@ -1,7 +1,8 @@
-"""SQLite: пользователи, сессии, разборы.
+"""SQLite: пользователи, сессии, разборы, проверки анкеты.
 
-Храним минимум: стенограмму и состояние. Никаких профилей «жены» и прочих
-догадок о реальной жизни пользователя — это не нужно продукту и опасно.
+Храним минимум: стенограмму, состояние и — для «Проверки анкеты» — текст,
+который пользователь сам прислал для разбора. Никаких догадок о реальной
+жизни пользователя: только то, что он принёс сам.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -43,7 +44,26 @@ CREATE TABLE IF NOT EXISTS debriefs (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS profile_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    phase TEXT NOT NULL DEFAULT 'name',
+    name TEXT NOT NULL DEFAULT '',
+    age INTEGER,
+    bio TEXT NOT NULL DEFAULT '',
+    text_iterations INTEGER NOT NULL DEFAULT 0,
+    photo_reviews INTEGER NOT NULL DEFAULT 0,
+    last_text_score INTEGER,
+    last_text_verdict TEXT NOT NULL DEFAULT '',
+    last_photo_verdict TEXT NOT NULL DEFAULT '',
+    photo_contents TEXT NOT NULL DEFAULT '[]',
+    completed INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id, finished);
+CREATE INDEX IF NOT EXISTS idx_profile_checks_user ON profile_checks(user_id, completed);
 """
 
 
@@ -80,6 +100,34 @@ class SessionOverview:
     user_turns: int
     finished: bool
     debrief: str | None
+
+
+@dataclass
+class StoredProfileCheck:
+    """Прогон «Проверки анкеты»: текст живёт в базе, фото — никогда."""
+
+    id: int
+    user_id: int
+    phase: str  # name | bio | menu | photos | done | abandoned
+    name: str
+    age: int | None
+    bio: str
+    text_iterations: int
+    photo_reviews: int
+    last_text_score: int | None
+    last_text_verdict: str
+    last_photo_verdict: str
+    completed: bool
+    created_at: str
+    updated_at: str | None
+    # Что на его фото, нейтрально (JSON-список коротких описаний): выжимка
+    # для героинь, чтобы им было о чём спросить. С дефолтом и в конце —
+    # после полей без дефолтов.
+    photo_contents: list[str] = field(default_factory=list)
+
+    @property
+    def is_active(self) -> bool:
+        return self.phase not in ("done", "abandoned")
 
 
 class Storage:
@@ -127,6 +175,16 @@ class Storage:
             self._conn.execute(
                 "UPDATE sessions SET scenario_id = ? WHERE scenario_id = ?",
                 (new_id, old_id),
+            )
+        # «Проверка анкеты»: описания содержимого фото для героинь — колонка
+        # младше самой таблицы, у кого-то её ещё нет.
+        pc_columns = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(profile_checks)")
+        }
+        if pc_columns and "photo_contents" not in pc_columns:
+            self._conn.execute(
+                "ALTER TABLE profile_checks ADD COLUMN photo_contents TEXT "
+                "NOT NULL DEFAULT '[]'"
             )
 
     def close(self) -> None:
@@ -278,7 +336,7 @@ class Storage:
         return str(row["payload"]) if row is not None else None
 
     def delete_user(self, telegram_id: int) -> None:
-        """Удаление по запросу: вся история, сессии и разборы."""
+        """Удаление по запросу: вся история, сессии, разборы и проверки анкеты."""
         with self._lock:
             row = self._conn.execute(
                 "SELECT id FROM users WHERE telegram_id = ?", (telegram_id,)
@@ -287,6 +345,78 @@ class Storage:
                 return
             self._conn.execute("DELETE FROM users WHERE id = ?", (row["id"],))
             self._conn.commit()
+
+    # --- «Проверка анкеты» -------------------------------------------------
+
+    def create_profile_check(self, user_id: int) -> int:
+        """Новый прогон; прежние незакрытые помечаем покинутыми."""
+        with self._lock:
+            now = _now()
+            self._conn.execute(
+                """UPDATE profile_checks SET phase = 'abandoned', updated_at = ?
+                   WHERE user_id = ? AND phase NOT IN ('done', 'abandoned')""",
+                (now, user_id),
+            )
+            cursor = self._conn.execute(
+                """INSERT INTO profile_checks (user_id, phase, created_at, updated_at)
+                   VALUES (?, 'name', ?, ?)""",
+                (user_id, now, now),
+            )
+            self._conn.commit()
+            return int(cursor.lastrowid)
+
+    def get_active_profile_check(self, user_id: int) -> StoredProfileCheck | None:
+        with self._lock:
+            row = self._conn.execute(
+                """SELECT * FROM profile_checks
+                   WHERE user_id = ? AND phase NOT IN ('done', 'abandoned')
+                   ORDER BY id DESC LIMIT 1""",
+                (user_id,),
+            ).fetchone()
+        return _row_to_profile_check(row) if row is not None else None
+
+    def update_profile_check(self, check_id: int, **fields: Any) -> None:
+        """Точечное обновление; имена колонок — из белого списка ниже.
+
+        Списки и словари (photo_contents) сериализуются в JSON: в базе
+        строка, в памяти объекта — список.
+        """
+        allowed = {
+            "phase", "name", "age", "bio", "text_iterations", "photo_reviews",
+            "last_text_score", "last_text_verdict", "last_photo_verdict",
+            "photo_contents", "completed",
+        }
+        updates = {}
+        for key, value in fields.items():
+            if key not in allowed:
+                continue
+            if isinstance(value, (list, dict)):
+                value = json.dumps(value, ensure_ascii=False)
+            updates[key] = value
+        if not updates:
+            return
+        sets = ", ".join(f"{key} = ?" for key in updates)
+        params = list(updates.values()) + [_now(), check_id]
+        with self._lock:
+            self._conn.execute(
+                f"UPDATE profile_checks SET {sets}, updated_at = ? WHERE id = ?",
+                params,
+            )
+            self._conn.commit()
+
+    def last_completed_profile(self, user_id: int) -> StoredProfileCheck | None:
+        """Последняя доведённая до конца проверка: её героини берут в разговор."""
+        with self._lock:
+            row = self._conn.execute(
+                """SELECT * FROM profile_checks
+                   WHERE user_id = ? AND completed = 1 AND bio != ''
+                   ORDER BY id DESC LIMIT 1""",
+                (user_id,),
+            ).fetchone()
+        return _row_to_profile_check(row) if row is not None else None
+
+    def has_completed_profile(self, user_id: int) -> bool:
+        return self.last_completed_profile(user_id) is not None
 
 
 def _row_to_session(row: sqlite3.Row) -> StoredSession:
@@ -301,6 +431,33 @@ def _row_to_session(row: sqlite3.Row) -> StoredSession:
         created_at=str(row["created_at"]),
         updated_at=row["updated_at"],
         ended_by_persona=bool(row["ended_by_persona"]),
+    )
+
+
+def _row_to_profile_check(row: sqlite3.Row) -> StoredProfileCheck:
+    age = row["age"]
+    try:
+        contents = json.loads(row["photo_contents"] or "[]")
+    except (json.JSONDecodeError, TypeError):
+        contents = []
+    if not isinstance(contents, list):
+        contents = []
+    return StoredProfileCheck(
+        id=int(row["id"]),
+        user_id=int(row["user_id"]),
+        phase=str(row["phase"]),
+        name=str(row["name"]),
+        age=int(age) if age is not None else None,
+        bio=str(row["bio"]),
+        text_iterations=int(row["text_iterations"]),
+        photo_reviews=int(row["photo_reviews"]),
+        last_text_score=row["last_text_score"],
+        last_text_verdict=str(row["last_text_verdict"]),
+        last_photo_verdict=str(row["last_photo_verdict"]),
+        photo_contents=[str(item) for item in contents],
+        completed=bool(row["completed"]),
+        created_at=str(row["created_at"]),
+        updated_at=row["updated_at"],
     )
 
 

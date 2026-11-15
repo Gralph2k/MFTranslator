@@ -343,6 +343,7 @@ def persona_system_prompt(
     state: PersonaState,
     previous: list[dict[str, str]] | None = None,
     turns_left: int | None = None,
+    player_profile: str | None = None,
 ) -> str:
     persona = scenario.persona
     secrets = "\n".join(f"- {item}" for item in scenario.secrets)
@@ -354,6 +355,9 @@ def persona_system_prompt(
     correspondence = _correspondence_block(scenario)
     call = _call_block(scenario)
     previous_chat = _previous_chat_block(previous)
+    # Анкета игрока (он проверял её в боте): героиня «читала» профиль в приложении
+    # и может естественно на него ссылаться. None — анкеты нет, блок пустой.
+    profile_block = f"{player_profile}\n" if player_profile else ""
     red_flags = _red_flags_block(scenario)
     examiner = _examiner_block(scenario)
     wind_down = _wind_down_block(scenario, turns_left)
@@ -409,7 +413,7 @@ def persona_system_prompt(
 {correspondence}{call}Что происходит:
 {scenario.situation}
 
-{previous_chat}Твой характер: {traits}.
+{previous_chat}{profile_block}Твой характер: {traits}.
 Как ты говоришь: {persona.speech}
 
 Твоё состояние прямо сейчас: {state.describe()}
@@ -520,11 +524,14 @@ def persona_messages(
     history: list[Reply],
     previous: list[dict[str, str]] | None = None,
     turns_left: int | None = None,
+    player_profile: str | None = None,
 ) -> list[dict[str, str]]:
     messages: list[dict[str, str]] = [
         {
             "role": "system",
-            "content": persona_system_prompt(scenario, state, previous, turns_left),
+            "content": persona_system_prompt(
+                scenario, state, previous, turns_left, player_profile
+            ),
         }
     ]
     messages.extend(history)
@@ -750,6 +757,8 @@ def rules_text(scenario: Scenario) -> str:
 
     Подсказки на первый ход здесь нет намеренно: игрок должен сам заметить,
     за что зацепиться, иначе упражнение начинается с готового ответа.
+    Количество сообщений не называем: лимит — страховка движка, а не условие
+    игры; игрок, считающий ходы, следит за счётчиком, а не за ней.
     """
     if scenario.is_correspondence:
         first_moves = (
@@ -775,11 +784,30 @@ def rules_text(scenario: Scenario) -> str:
         "Здесь можно ошибаться: разбор будет по твоим репликам, а не по тебе.\n\n"
         "Как играть:\n"
         f"{first_moves}"
-        f"3. У тебя {scenario.turn_limit} сообщений. Потом разбор придёт сам.\n\n"
+        "Когда разговор закончится, разбор придёт сам.\n\n"
         "Советы:\n"
         "• не угадывай её состояние и не давай советов, если о них не просят;\n"
         "• один вопрос за реплику — после вопроса дай ей ответить;\n"
         "• описывай, что замечаешь, а не оценивай её.\n\n"
         "Команды: /finish — закончить раньше, "
         "/restart — заново, /menu — выбрать сценарий."
+    )
+
+
+def start_intro() -> str:
+    """Приветствие бота «Чего хотят женщины»: куда идти и зачем.
+
+    Это лендинг, а не сценарий: две задачи бота и цель. Подробности каждая
+    ветка расскажет сама — здесь только входы.
+    """
+    return (
+        "Чего хотят женщины — тренажёр знакомств.\n\n"
+        "Здесь две задачи:\n"
+        "— Проверка анкеты: пришли текст и фото анкеты — получишь честный разбор "
+        "со счётом: что отпугивает, что цепляет, как исправить.\n"
+        "— Тренировка: переписка с героинями, у каждой свой характер и скрытая "
+        "история; разбор каждого твоего хода.\n\n"
+        "Цель — чтобы анкета стала привлекательнее, а ты знакомился увереннее, "
+        "лучше понимал женщин и чувствовал себя спокойнее.\n\n"
+        "С чего начнём? /check — проверить анкету, /menu — выбрать героиню."
     )

@@ -15,15 +15,25 @@ def scenario_title(scenario_id: str) -> str:
         return scenario_id
 
 
-def heroines_menu() -> InlineKeyboardMarkup:
-    rows = [
+def heroines_menu(with_check: bool = True) -> InlineKeyboardMarkup:
+    """Главное меню: «Проверка анкеты» первой строкой, ниже — героини.
+
+    `with_check=False` — мостик после проверки: там анкета уже не нужна,
+    зовём сразу к героиням.
+    """
+    rows: list[list[InlineKeyboardButton]] = []
+    if with_check:
+        rows.append(
+            [InlineKeyboardButton(text="Проверка анкеты", callback_data="profile:start")]
+        )
+    rows.extend(
         [
             InlineKeyboardButton(
                 text=heroine.menu_title, callback_data=f"menu:heroine:{heroine.id}"
             )
         ]
         for heroine in heroines()
-    ]
+    )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

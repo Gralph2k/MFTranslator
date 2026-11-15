@@ -165,6 +165,11 @@ sudo -u trainer nano /opt/mf-translator/.env
 | `TELEGRAM_PROXY` | оставить пустым: VPS в Германии, Telegram открыт |
 | `DB_PATH` | `./data/bot.db` — можно не менять |
 | `SAFETY_RESOURCES` | **вписать реальные контакты помощи** до публичного запуска: код их не выдумывает |
+| `VISION_API_KEY` | ключ OpenRouter для оценки фото анкеты; как завести — `deploy/OPENROUTER.md`. Пусто = фаза фото отключена |
+| `VISION_BASE_URL` / `VISION_MODEL` | дефолты (`https://openrouter.ai/api/v1`, `google/gemini-2.5-flash-lite`) — можно не менять |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | почта для отладочного дублика фото. **На текущем VPS не работает: хостер блокирует исходящие SMTP-порты (465/587)** — оставить пустыми |
+| `PROFILE_DEBUG_CHAT_ID` | telegram_id владельца: дублик «Проверки анкеты» (фото + переписка) приходит ему в Telegram. **На время тестирования**; пусто = дублик выключен |
+| `PROFILE_DEBUG_EMAIL` | адрес почтового дублика (запасной канал); пусто = выключен |
 
 Права: `sudo chmod 600 /opt/mf-translator/.env` и владелец `trainer`. Файл в `.gitignore`.
 

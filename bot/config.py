@@ -22,6 +22,18 @@ class Settings:
     deepseek_model: str
     db_path: Path
     safety_resources: str | None
+    # Проверка анкеты: vision-модель (OpenRouter) и отладочная почта.
+    vision_api_key: str | None
+    vision_base_url: str
+    vision_model: str
+    smtp_host: str | None
+    smtp_port: int
+    smtp_user: str | None
+    smtp_pass: str | None
+    # Пусто — дублик фото на почту выключен. Время тестирования; вырубить = очистить и рестарт.
+    profile_debug_email: str | None
+    # Дублик в Telegram-чат владельца: работает там, где SMTP закрыт хостером.
+    profile_debug_chat_id: int | None
 
     @property
     def has_llm(self) -> bool:
@@ -31,12 +43,33 @@ class Settings:
     def has_telegram(self) -> bool:
         return bool(self.telegram_bot_token)
 
+    @property
+    def has_vision(self) -> bool:
+        return bool(self.vision_api_key)
+
+    @property
+    def debug_email_enabled(self) -> bool:
+        """Почтовый дублик включён, только если есть и адрес, и пароль."""
+        return bool(self.profile_debug_email and self.smtp_user and self.smtp_pass)
+
+    @property
+    def debug_chat_enabled(self) -> bool:
+        """Telegram-дублик включён:_chat_id задан (может быть только у владельца)."""
+        return self.profile_debug_chat_id is not None
+
 
 def _clean(value: str | None) -> str | None:
     if value is None:
         return None
     value = value.strip()
     return value or None
+
+
+def _int_or_none(value: str | None) -> int | None:
+    try:
+        return int(value) if value else None
+    except ValueError:
+        return None
 
 
 def load_settings(env_file: Path | None = None) -> Settings:
@@ -59,4 +92,13 @@ def load_settings(env_file: Path | None = None) -> Settings:
         deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
         db_path=db_path,
         safety_resources=_clean(os.getenv("SAFETY_RESOURCES")),
+        vision_api_key=_clean(os.getenv("VISION_API_KEY")),
+        vision_base_url=os.getenv("VISION_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/"),
+        vision_model=os.getenv("VISION_MODEL", "google/gemini-2.5-flash-lite"),
+        smtp_host=_clean(os.getenv("SMTP_HOST")),
+        smtp_port=int(os.getenv("SMTP_PORT", "465")),
+        smtp_user=_clean(os.getenv("SMTP_USER")),
+        smtp_pass=_clean(os.getenv("SMTP_PASS")),
+        profile_debug_email=_clean(os.getenv("PROFILE_DEBUG_EMAIL")),
+        profile_debug_chat_id=_int_or_none(os.getenv("PROFILE_DEBUG_CHAT_ID")),
     )

@@ -54,10 +54,20 @@ class DialogueSession:
     session_id: int | None = None
     # Переписка из сценария-продолжения: персонаж её помнит, и она попадает в промпт.
     previous: list[dict[str, str]] = field(default_factory=list)
+    # Дополнительные ходы за заполненную анкету: поле сессии, а не сценария —
+    # Scenario шарится между пользователями, мутация меняла бы лимит всем.
+    bonus_turns: int = 0
+    # Выжимка анкеты игрока (он прошёл «Проверку анкеты»): героиня ссылается на неё
+    # в разговоре. None — анкеты нет.
+    player_profile: str | None = None
+
+    @property
+    def turn_limit_total(self) -> int:
+        return self.scenario.turn_limit + self.bonus_turns
 
     @property
     def turns_left(self) -> int:
-        return max(0, self.scenario.turn_limit - self.user_turns)
+        return max(0, self.turn_limit_total - self.user_turns)
 
     @property
     def is_over(self) -> bool:
@@ -144,6 +154,7 @@ class DialogueEngine:
                     session.history,
                     session.previous,
                     turns_left=session.turns_left,
+                    player_profile=session.player_profile,
                 ),
                 json_mode=False,
                 temperature=0.85,

@@ -21,10 +21,23 @@ def _texts(markup) -> list[str]:
 def test_heroines_menu_lists_only_active_heroines():
     markup = heroines_menu()
 
-    assert _callbacks(markup) == ["menu:heroine:vera", "menu:heroine:eva"]
+    # «Проверка анкеты» — первая кнопка главного меню, ниже — героини.
+    assert _callbacks(markup) == [
+        "profile:start",
+        "menu:heroine:vera",
+        "menu:heroine:eva",
+    ]
     texts = _texts(markup)
-    assert texts[0].startswith("Вера, 30")
-    assert texts[1].startswith("Ева, 26")
+    assert texts[0] == "Проверка анкеты"
+    assert texts[1].startswith("Вера, 30")
+    assert texts[2].startswith("Ева, 26")
+
+
+def test_heroines_menu_without_check_for_bridge():
+    """После проверки анкеты мостик зовёт сразу к героиням."""
+    markup = heroines_menu(with_check=False)
+
+    assert _callbacks(markup) == ["menu:heroine:vera", "menu:heroine:eva"]
 
 
 def test_heroine_menu_lists_scenarios_in_story_order():

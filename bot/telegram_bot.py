@@ -1,23 +1,33 @@
-"""Telegram-бот на aiogram 3: команды, диалог, разбор."""
+"""Telegram-бот на aiogram 3: команды, диалог, разбор, проверка анкеты."""
 
 from __future__ import annotations
 
 import asyncio
+import io
 import logging
-from pathlib import Path
+from dataclasses import dataclass, field
 from typing import Any
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.exceptions import TelegramNetworkError, TelegramUnauthorizedError
 from aiogram.filters import Command, CommandStart
-from aiogram.types import CallbackQuery, FSInputFile, InputMediaPhoto, Message
+from aiogram.types import (
+    BufferedInputFile,
+    CallbackQuery,
+    FSInputFile,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputMediaPhoto,
+    Message,
+)
 
 from .config import Settings, load_settings
+from .email_debug import send_debug_email
 from .engine import DialogueEngine, DialogueSession
 from .faces import emotion_for_state, face_path
 from .launcher import clear_pid, write_pid
-from .llm import DeepSeekLLM, LLM
+from .llm import DeepSeekLLM, LLM, parse_json_object
 from .heroines import random_heroine, story_scenarios
 from .menus import (
     after_finish_menu,
@@ -25,11 +35,30 @@ from .menus import (
     heroines_menu,
 )
 from .profile_card import render_profile_cards
-from .prompts import backstory_text, profile_text, rules_text
+from .profile_check import (
+    PROFILE_BONUS_TURNS,
+    PhotoReview,
+    TextReview,
+    compress_photo,
+    consultant_messages,
+    final_summary,
+    load_config,
+    parse_name_age,
+    parse_photo_review,
+    parse_text_review,
+    photo_system_prompt,
+    photo_user_prompt,
+    player_profile_block,
+    render_photo_review,
+    render_text_review,
+    t,
+)
+from .prompts import backstory_text, format_transcript, profile_text, rules_text, start_intro
 from .safety import CrisisDetected, safety_message
 from .scenario import Scenario, ScenarioError, load_scenario
 from .state import PersonaState
-from .storage import Storage, StoredSession
+from .storage import Storage, StoredProfileCheck, StoredSession
+from .vision import VisionLLM
 
 log = logging.getLogger(__name__)
 router = Router()
@@ -37,6 +66,22 @@ router = Router()
 MAX_MESSAGE = 4000
 # Сколько последних сообщений прошлой переписки персонаж помнит в продолжении.
 PREVIOUS_MESSAGES = 12
+
+
+@dataclass
+class ProfileFlow:
+    """Активный прогон «Проверки анкеты» в памяти.
+
+    Текст и счётчики живут в базе и переживают рестарт; здесь — только то, что
+    в базе не хранится: file_id присланных фото (Telegram держит их у себя,
+    мы — принципиально нет) и структурные разборы для финального резюме.
+    """
+
+    check: StoredProfileCheck
+    photo_ids: list[str] = field(default_factory=list)
+    name_retries: int = 0
+    text_review: TextReview | None = None
+    photo_review: PhotoReview | None = None
 
 
 class Trainer:
@@ -49,6 +94,8 @@ class Trainer:
         default_scenario: Scenario,
         safety_resources: str | None = None,
         with_faces: bool = True,
+        vision: VisionLLM | None = None,
+        settings: Settings | None = None,
     ) -> None:
         self.engine = engine
         self.storage = storage
@@ -57,10 +104,16 @@ class Trainer:
         # Фото — часть сценария; флаг нужен тестам, чтобы не звать Telegram.
         self.with_faces = with_faces
         self.sessions: dict[int, DialogueSession] = {}
+        self.profile_flows: dict[int, ProfileFlow] = {}
         self._scenarios: dict[str, Scenario] = {default_scenario.id: default_scenario}
         # Telegram хранит загруженный файл у себя: второй раз шлём по file_id,
         # иначе каждый ход тратит время на загрузку полумегабайтной картинки.
         self.face_file_ids: dict[str, str] = {}
+        # Vision для оценки фото анкеты; None — ключ не настроен, фаза фото
+        # вежливо откажет вместо падения.
+        self.vision = vision
+        # Для отладочного почтового дублика (включается PROFILE_DEBUG_EMAIL).
+        self.settings = settings
         # Замок на пользователя: aiogram обрабатывает апдейты конкурентно
         # (start_polling с handle_as_tasks=True), а ходы одного диалога должны
         # идти по порядку — иначе реплики перемешаются, а разбор задвоится.
@@ -99,6 +152,9 @@ class Trainer:
             session_id=stored.id,
             previous=self._previous_chat(user_id, scenario),
         )
+        # Бонус за заполненную анкету считаем заново: поле не в базе, а факт
+        # «анкета заполнена» — в базе. Иначе после рестарта лимит скакнул бы назад.
+        self._apply_profile(user_id, session)
         self.sessions[telegram_id] = session
         return session
 
@@ -129,11 +185,22 @@ class Trainer:
 
         scenario = self.default_scenario if scenario_id is None else self.scenario_by_id(scenario_id)
         session = self.engine.start(scenario, self._previous_chat(user_id, scenario))
+        self._apply_profile(user_id, session)
         session.session_id = self.storage.create_session(
             user_id, scenario.id, session.state.to_mapping(), session.history
         )
         self.sessions[telegram_id] = session
         return session
+
+    def _apply_profile(self, user_id: int, session: DialogueSession) -> None:
+        """Заполненная анкета: +3 хода и выжимка (текст + фото) для промпта героини."""
+        profile = self.storage.last_completed_profile(user_id)
+        if profile is None:
+            return
+        session.bonus_turns = PROFILE_BONUS_TURNS
+        session.player_profile = player_profile_block(
+            profile.name, profile.age, profile.bio, profile.photo_contents
+        )
 
     def _previous_chat(self, user_id: int, scenario: Scenario) -> list[dict[str, str]]:
         """Переписка из сценария-продолжения: последняя удачная попытка или канон.
@@ -168,6 +235,57 @@ class Trainer:
             session.finished,
             ended_by_persona=session.ended_by_persona,
         )
+
+    # --- «Проверка анкеты» --------------------------------------------------
+
+    def get_profile_flow(self, telegram_id: int) -> ProfileFlow | None:
+        """Флоу из памяти или, после рестарта бота, из базы (кроме фото-фазы)."""
+        flow = self.profile_flows.get(telegram_id)
+        if flow is not None:
+            return flow if flow.check.is_active else None
+
+        user_id = self.storage.ensure_user(telegram_id)
+        stored = self.storage.get_active_profile_check(user_id)
+        if stored is None:
+            return None
+        flow = ProfileFlow(check=stored)
+        self.profile_flows[telegram_id] = flow
+        return flow
+
+    def start_profile_flow(self, telegram_id: int) -> ProfileFlow:
+        user_id = self.storage.ensure_user(telegram_id)
+        self.storage.create_profile_check(user_id)
+        stored = self.storage.get_active_profile_check(user_id)
+        if stored is None:  # не должно случиться: только что создали
+            raise RuntimeError("profile_check не создался")
+        flow = ProfileFlow(check=stored)
+        self.profile_flows[telegram_id] = flow
+        return flow
+
+    def save_flow(self, flow: ProfileFlow, **fields: Any) -> None:
+        """Пишет поля в базу и синхронизирует копию в памяти."""
+        self.storage.update_profile_check(flow.check.id, **fields)
+        for key, value in fields.items():
+            setattr(flow.check, key, value)
+
+    def close_profile_flow(self, telegram_id: int, completed: bool = False) -> None:
+        """Закрывает флоу — завершением, отменой или уходом в сценарий."""
+        flow = self.profile_flows.pop(telegram_id, None)
+        check = flow.check if flow is not None else None
+        if check is None:
+            user_id = self.storage.ensure_user(telegram_id)
+            stored = self.storage.get_active_profile_check(user_id)
+            check = stored
+        if check is None:
+            return
+        self.storage.update_profile_check(
+            check.id,
+            phase="done" if completed else "abandoned",
+            completed=int(completed),
+        )
+
+    def profile_flow_active(self, telegram_id: int) -> bool:
+        return self.get_profile_flow(telegram_id) is not None
 
 
 # Единственный экземпляр Trainer на процесс: хендлеры aiogram статичны.
@@ -283,10 +401,11 @@ async def _send_profile(
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     trainer = _trainer(message)
-    # /start выбирает случайную героиню: повторная команда не даёт ту же подряд.
-    last = trainer.last_heroine(message.from_user.id)
-    heroine = random_heroine(last)
-    await _begin(message, trainer, message.from_user.id, heroine.first_scenario)
+    # /start — лендинг бота: что здесь можно и зачем. Сценарий игрок выбирает сам.
+    async with trainer.user_lock(message.from_user.id):
+        trainer.close_profile_flow(message.from_user.id)
+    await _send_long(message, start_intro())
+    await message.answer("С чего начнём?", reply_markup=heroines_menu())
 
 
 async def _begin(
@@ -297,6 +416,9 @@ async def _begin(
 ) -> None:
     """Начинает сценарий: сначала правила, потом описание и картинки."""
     async with trainer.user_lock(telegram_id):
+        # Сценарий забирает тексты себе: активная проверка анкеты закрывается,
+        # иначе её флоу-хендлер перехватывал бы реплики диалога.
+        trainer.close_profile_flow(telegram_id)
         try:
             session = trainer.start_session(telegram_id, scenario_id)
         except ScenarioError:
@@ -405,11 +527,544 @@ async def _deliver_debrief(
     if session.session_id is not None:
         trainer.storage.save_debrief(session.session_id, text)
     session.debrief_sent = True
+    # Отчёт владельцу: переписка и разбор каждого завершённого сценария.
+    _notify_owner(
+        target.bot,
+        trainer,
+        _scenario_report(telegram_id, session, text),
+    )
     await _send_face(target, trainer, session, "Так она закончила разговор.")
     await _send_long(target, text)
     await target.answer(
         "Что дальше?", reply_markup=after_finish_menu(session.scenario.id)
     )
+
+
+def _scenario_report(
+    telegram_id: int, session: DialogueSession, debrief_text: str
+) -> str:
+    """Текст отчёта о завершённом сценарии: кто, где, переписка, разбор."""
+    scenario = session.scenario
+    header = (
+        f"Сценарий: {scenario.title} ({scenario.id})\n"
+        f"Игрок: tg {telegram_id}\n"
+    )
+    transcript = format_transcript(session.history, scenario.persona.name)
+    return f"{header}\nПереписка:\n{transcript}\n\nРазбор:\n{debrief_text}"
+
+
+# --- «Проверка анкеты»: флоу ----------------------------------------------
+# Хендлеры регистрируются ДО on_text: иначе тексты анкеты уйдут в диалог.
+# Команды (/check, /cancel) зарегистрированы ещё раньше и перехватываются
+# своими Command-фильтрами.
+
+
+def _review_keyboard(rework_allowed: bool) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if rework_allowed:
+        rows.append(
+            [InlineKeyboardButton(text="Доработать текст", callback_data="profile:rework")]
+        )
+    rows.append([InlineKeyboardButton(text="Перейти к фото", callback_data="profile:to_photos")])
+    rows.append([InlineKeyboardButton(text="Пропустить фото", callback_data="profile:skip_photos")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _photos_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Оценить фото", callback_data="profile:evaluate")],
+            [InlineKeyboardButton(text="Завершить без фото", callback_data="profile:finish")],
+        ]
+    )
+
+
+def _after_photo_review_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Прислать другие фото", callback_data="profile:to_photos")],
+            [InlineKeyboardButton(text="Завершить", callback_data="profile:finish")],
+        ]
+    )
+
+
+def _finish_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="Завершить", callback_data="profile:finish")]]
+    )
+
+
+def _vision_provider_label(trainer: "Trainer") -> str:
+    """Куда на самом деле уходят фото: имя провайдера и модель из настроек.
+
+    Текст предупреждения не должен врать при смене VISION_*: провайдера
+    вычисляем из base_url, а не пишем руками в конфиг.
+    """
+    settings = trainer.settings
+    if settings is None or not settings.vision_base_url:
+        return "внешняя нейросеть"
+    host = settings.vision_base_url.split("//")[-1].split("/")[0].lower()
+    if "z.ai" in host or "bigmodel" in host:
+        provider = "GLM"
+    elif "openrouter" in host:
+        provider = "OpenRouter"
+    else:
+        provider = host
+    return f"{provider}, модель {settings.vision_model}"
+
+
+def _privacy_warning(trainer: "Trainer") -> str:
+    """Предупреждение перед фото: внешний сервис анализа и что мы ничего не храним.
+
+    Отладочный дублик разработчику в тексте не упоминаем (решение владельца:
+    не пугать пользователей) — он уходит тихо, сам текст предупреждения не меняет.
+    """
+    return load_config()["privacy_warning"].format(provider=_vision_provider_label(trainer))
+
+
+async def _run_check(target: Message, trainer: "Trainer", telegram_id: int) -> None:
+    """/check: новый прогон или возобновление после рестарта. Лок уже взят."""
+    flow = trainer.get_profile_flow(telegram_id)
+    if flow is None:
+        flow = trainer.start_profile_flow(telegram_id)
+        await target.answer(t("ask_name"))
+        return
+
+    phase = flow.check.phase
+    if phase == "name":
+        await target.answer(t("ask_name"))
+    elif phase == "bio":
+        await target.answer(t("ask_bio"))
+    elif phase == "menu":
+        cfg = load_config()
+        await target.answer(
+            t("flow_active_hint"),
+            reply_markup=_review_keyboard(
+                flow.check.text_iterations < cfg["max_text_iterations"]
+            ),
+        )
+    else:  # photos
+        await target.answer(t("photo_phase_reset", max=cfg_max_photos()))
+        await target.answer(t("ask_photos", max=cfg_max_photos()), reply_markup=_photos_keyboard())
+
+
+def cfg_max_photos() -> int:
+    return int(load_config()["max_photos"])
+
+
+@router.message(Command("check"))
+async def cmd_check(message: Message) -> None:
+    trainer = _trainer(message)
+    async with trainer.user_lock(message.from_user.id):
+        await _run_check(message, trainer, message.from_user.id)
+
+
+@router.message(Command("cancel"))
+async def cmd_cancel(message: Message) -> None:
+    trainer = _trainer(message)
+    async with trainer.user_lock(message.from_user.id):
+        had_flow = trainer.get_profile_flow(message.from_user.id) is not None
+        trainer.close_profile_flow(message.from_user.id)
+    if had_flow:
+        await message.answer(t("cancel"))
+
+
+async def _review_text(
+    target: Message,
+    trainer: "Trainer",
+    telegram_id: int,
+    flow: ProfileFlow,
+    bio: str,
+) -> None:
+    """Разбор текста анкеты: deepseek, счёт считает код. Лок уже взят."""
+    cfg = load_config()
+    if len(bio) > cfg["max_length"]:
+        await target.answer(t("bio_too_long", length=len(bio), max=cfg["max_length"]))
+        return
+
+    trainer.save_flow(flow, bio=bio)
+    await target.answer(t("analyzing_text"))
+    try:
+        raw = await trainer.engine.llm.complete(
+            consultant_messages(flow.check.name, flow.check.age or 0, bio),
+            json_mode=True,
+            temperature=0.3,
+        )
+        review = parse_text_review(parse_json_object(raw))
+    except Exception as exc:
+        log.exception("разбор анкеты не получился")
+        await target.answer(f"Разбор не получился: {exc}. Пришли текст ещё раз.")
+        return
+
+    rendered = render_text_review(review)
+    flow.text_review = review
+    trainer.save_flow(
+        flow,
+        text_iterations=flow.check.text_iterations + 1,
+        last_text_score=review.score,
+        last_text_verdict=rendered,
+        phase="menu",
+    )
+    await _send_long(target, rendered)
+    rework_allowed = flow.check.text_iterations < cfg["max_text_iterations"]
+    if not rework_allowed:
+        await target.answer(t("text_iterations_over"))
+    await target.answer("Что дальше?", reply_markup=_review_keyboard(rework_allowed))
+
+
+async def _download_photos(bot: Bot, file_ids: list[str]) -> list[bytes]:
+    """Скачивает и сжимает параллельно; битые кадры молча пропускает."""
+
+    async def fetch(file_id: str) -> bytes | None:
+        try:
+            file = await bot.get_file(file_id)
+            if file.file_path is None:
+                return None
+            buffer = io.BytesIO()
+            await bot.download_file(file.file_path, destination=buffer)
+            return compress_photo(buffer.getvalue())
+        except Exception:
+            log.exception("не скачал фото")
+            return None
+
+    results = await asyncio.gather(*(fetch(file_id) for file_id in file_ids))
+    return [item for item in results if item is not None]
+
+
+async def _send_debug_dump(
+    bot: Bot,
+    chat_id: int,
+    caption: str,
+    text: str,
+    images: list[bytes],
+) -> None:
+    """Отладочный дублик владельцу в Telegram: фото альбомом + переписка текстом.
+
+    Замена почтовому дублику: хостер режет исходящие SMTP-порты (465/587),
+    а Telegram-канал у бота уже есть.
+    """
+    if images:
+        media = [
+            InputMediaPhoto(
+                media=BufferedInputFile(image, filename=f"photo_{index + 1}.jpg"),
+                caption=caption[:1024] if index == 0 else None,
+            )
+            for index, image in enumerate(images[:10])
+        ]
+        await bot.send_media_group(chat_id, media=media)
+    # Длинный текст режем по строкам, как _send_long, но через bot.send_message.
+    while text:
+        chunk, text = text[:MAX_MESSAGE], text[MAX_MESSAGE:]
+        if text:
+            cut = chunk.rfind("\n")
+            if cut > MAX_MESSAGE // 2:
+                chunk, text = chunk[:cut], chunk[cut:] + text
+        await bot.send_message(chat_id, chunk.strip())
+
+
+def _schedule_debug_dump(
+    bot: Bot,
+    trainer: "Trainer",
+    telegram_id: int,
+    flow: ProfileFlow,
+    images: list[bytes],
+) -> None:
+    """Планирует отправку дублика в фоне: чат владельца или почта, что включено."""
+    settings = trainer.settings
+    if settings is None:
+        return
+    check = flow.check
+    caption = f"Анкета: {check.name or '—'} ({check.age or '?'}) — tg {telegram_id}"
+    body = (
+        f"telegram_id: {telegram_id}\n"
+        f"Имя: {check.name}\nВозраст: {check.age}\n"
+        f"Разборов текста: {check.text_iterations}, оценок фото: {check.photo_reviews}\n\n"
+        f"Текст анкеты:\n{check.bio or '—'}\n\n"
+        f"Последний разбор текста:\n{check.last_text_verdict or '—'}\n\n"
+        f"Последний разбор фото:\n{check.last_photo_verdict or '—'}"
+    )
+    if settings.debug_chat_enabled and settings.profile_debug_chat_id is not None:
+        async def _to_chat() -> None:
+            try:
+                await _send_debug_dump(
+                    bot, settings.profile_debug_chat_id, caption, body, images
+                )
+            except Exception:
+                log.exception("отладочный дублик в Telegram не ушёл")
+
+        asyncio.create_task(_to_chat())
+        return
+    if settings.debug_email_enabled:
+        send_debug_email(
+            settings,
+            caption,
+            body,
+            [(f"photo_{index + 1}.jpg", image) for index, image in enumerate(images)],
+        )
+
+
+def _notify_owner(bot: Bot, trainer: "Trainer", text: str) -> None:
+    """Отчёт владельцу о завершённом сценарии: переписка и разбор.
+
+    Каналы независимы: Telegram (пока SMTP на VPS закрыт хостером — основной)
+    и почта, если SMTP_* и PROFILE_DEBUG_EMAIL настроены и доступны.
+    """
+    settings = trainer.settings
+    if settings is None:
+        return
+    subject = text.splitlines()[0][:100] if text else "Разбор сценария"
+    if settings.debug_chat_enabled and settings.profile_debug_chat_id is not None:
+        chat_id = settings.profile_debug_chat_id
+
+        async def _to_chat() -> None:
+            try:
+                await _send_debug_dump(bot, chat_id, subject, text, [])
+            except Exception:
+                log.exception("отчёт о сценарии в Telegram не ушёл")
+
+        asyncio.create_task(_to_chat())
+    if settings.debug_email_enabled:
+        send_debug_email(settings, subject, text, [])
+
+
+async def _evaluate_photos(
+    target: Message,
+    trainer: "Trainer",
+    telegram_id: int,
+    flow: ProfileFlow,
+) -> None:
+    """Оценка набора фото одним vision-вызовом. Лок уже взят."""
+    cfg = load_config()
+    if not flow.photo_ids:
+        await target.answer(t("photo_empty"))
+        return
+    if trainer.vision is None:
+        await target.answer(t("photo_unavailable"), reply_markup=_finish_keyboard())
+        return
+    if flow.check.photo_reviews >= cfg["max_photo_reviews"]:
+        await _finish_flow(target, trainer, telegram_id, flow)
+        return
+
+    await target.answer(t("photo_analyzing"))
+    bot = target.bot
+    if bot is None:
+        return
+    images = await _download_photos(bot, flow.photo_ids)
+    if not images:
+        await target.answer("Не получилось скачать фотографии. Пришли ещё раз.")
+        return
+
+    # Отладочный дублик на время тестирования: фото + переписка владельцу.
+    # Fire-and-forget: доставка не должна задерживать ответ.
+    _schedule_debug_dump(bot, trainer, telegram_id, flow, images)
+
+    try:
+        data = await trainer.vision.review_photos(
+            photo_system_prompt(),
+            photo_user_prompt(flow.check.name, flow.check.age),
+            images,
+        )
+        review = parse_photo_review(data, expected=len(images))
+    except Exception as exc:
+        log.exception("оценка фото не получилась")
+        await target.answer(f"Не получилось оценить фото: {exc}. Попробуй ещё раз.")
+        return
+
+    rendered = render_photo_review(review)
+    flow.photo_review = review
+    trainer.save_flow(
+        flow,
+        photo_reviews=flow.check.photo_reviews + 1,
+        last_photo_verdict=rendered,
+        photo_contents=review.contents,
+    )
+    await _send_long(target, rendered)
+    if flow.check.photo_reviews >= cfg["max_photo_reviews"]:
+        await target.answer(t("photo_review_limit", max=cfg["max_photo_reviews"]))
+        await _finish_flow(target, trainer, telegram_id, flow)
+        return
+    await target.answer("Что дальше?", reply_markup=_after_photo_review_keyboard())
+
+
+async def _finish_flow(
+    target: Message,
+    trainer: "Trainer",
+    telegram_id: int,
+    flow: ProfileFlow,
+) -> None:
+    """Финальное резюме и мостик к героиням. Лок уже взят."""
+    text_advice = ""
+    if flow.text_review is not None:
+        reds = [flag for flag in flow.text_review.flags if flag.type == "red"]
+        if reds:
+            comment = f" — {reds[0].comment}" if reds[0].comment else ""
+            text_advice = f"{reds[0].title}{comment}"
+        elif flow.text_review.rewrite_after:
+            text_advice = flow.text_review.rewrite_after
+
+    photo_score: int | None = None
+    photo_advice = ""
+    if flow.photo_review is not None:
+        photo_score = flow.photo_review.set_score
+        photo_advice = flow.photo_review.set_advice
+
+    completed = bool(flow.check.bio.strip())
+    trainer.close_profile_flow(telegram_id, completed=completed)
+    await _send_long(
+        target,
+        final_summary(flow.check.last_text_score, text_advice, photo_score, photo_advice),
+    )
+    await target.answer(t("bridge"), reply_markup=heroines_menu(with_check=False))
+
+
+async def _handle_photo_batch(
+    trigger: Message,
+    trainer: "Trainer",
+    messages: list[Message],
+) -> None:
+    """Батч фото (альбом целиком или одиночное): копим или оцениваем. Лок берём здесь."""
+    telegram_id = trigger.from_user.id
+    async with trainer.user_lock(telegram_id):
+        flow = trainer.get_profile_flow(telegram_id)
+        if flow is None or flow.check.phase != "photos":
+            return
+
+        max_photos = cfg_max_photos()
+        fresh = [m.photo[-1].file_id for m in messages if m.photo]
+        if len(fresh) > max_photos:
+            await trigger.answer(t("album_extra", max=max_photos))
+            fresh = fresh[:max_photos]
+
+        room = max_photos - len(flow.photo_ids)
+        taken = fresh[:room]
+        if not taken:
+            await trigger.answer(t("photos_full", max=max_photos), reply_markup=_photos_keyboard())
+            return
+        flow.photo_ids.extend(taken)
+        count = len(flow.photo_ids)
+
+        # Альбом — полный комплект, 4-е одиночное фото — потолок: оцениваем сразу.
+        if len(messages) > 1 or count >= max_photos:
+            await _evaluate_photos(trigger, trainer, telegram_id, flow)
+            return
+        await trigger.answer(
+            t("photo_more_coming", count=count, max=max_photos),
+            reply_markup=_photos_keyboard(),
+        )
+
+
+class _PhotoCollector:
+    """Собирает альбом из параллельных апдейтов с одним media_group_id.
+
+    Замок здесь не берём принципиально: апдейты альбома приходят параллельными
+    тасками, и первый, удерживающий лок, не дал бы буферу наполниться. Лок
+    берёт _handle_photo_batch, когда батч уже собран.
+    """
+
+    def __init__(self) -> None:
+        self._groups: dict[str, list[Message]] = {}
+        self._timers: dict[str, asyncio.Task] = {}
+        self._done: set[str] = set()
+
+    def is_done(self, group_id: str) -> bool:
+        return group_id in self._done
+
+    def add(self, group_id: str, message: Message) -> None:
+        group = self._groups.setdefault(group_id, [])
+        if len(group) < 10:  # альбом Telegram длиннее 10 не бывает
+            group.append(message)
+        timer = self._timers.get(group_id)
+        if timer is not None:
+            timer.cancel()
+        self._timers[group_id] = asyncio.create_task(self._flush(group_id))
+
+    async def _flush(self, group_id: str) -> None:
+        await asyncio.sleep(1.2)
+        messages = self._groups.pop(group_id, [])
+        self._timers.pop(group_id, None)
+        self._done.add(group_id)
+        if not messages:
+            return
+        trainer = _trainer_instance
+        if trainer is None:
+            return
+        await _handle_photo_batch(messages[0], trainer, messages)
+
+
+_collector = _PhotoCollector()
+
+
+@router.message(F.photo)
+async def on_photo(message: Message) -> None:
+    trainer = _trainer(message)
+    if message.photo is None:
+        return
+    # Фото вне «Проверки анкеты» бот игнорирует — как и до неё.
+    flow = trainer.get_profile_flow(message.from_user.id)
+    if flow is None:
+        return
+    if flow.check.phase != "photos":
+        # На фазах имени и текста фото молча ждёт своего этапа; в «menu»
+        # подсказываем кнопки — разбор уже есть, кнопки под ним.
+        if flow.check.phase == "menu":
+            await message.answer(t("flow_active_hint"))
+        return
+
+    group_id = message.media_group_id
+    if group_id:
+        if _collector.is_done(group_id):
+            return  # опоздавший кадр уже обработанного альбома
+        _collector.add(group_id, message)
+        return
+    await _handle_photo_batch(message, trainer, [message])
+
+
+async def _profile_text_filter(message: Message) -> bool:
+    """Текст принадлежит флоу анкеты, а не диалогу с героиней.
+
+    Команды отсекаем: их разбирают Command-хендлеры выше по цепочке,
+    а неизвестное «/что-то» не должно попадать в текст анкеты.
+    """
+    trainer = _trainer_instance
+    if trainer is None or message.from_user is None:
+        return False
+    text = message.text or ""
+    if not text.strip() or text.startswith("/"):
+        return False
+    return trainer.profile_flow_active(message.from_user.id)
+
+
+@router.message(_profile_text_filter)
+async def on_profile_text(message: Message) -> None:
+    trainer = _trainer(message)
+    text = (message.text or "").strip()
+    async with trainer.user_lock(message.from_user.id):
+        flow = trainer.get_profile_flow(message.from_user.id)
+        if flow is None:
+            return
+
+        phase = flow.check.phase
+        if phase == "name":
+            parsed = parse_name_age(text, *load_config()["age_range"])
+            if parsed is None:
+                flow.name_retries += 1
+                if flow.name_retries >= 3:
+                    trainer.close_profile_flow(message.from_user.id)
+                    await message.answer(t("name_give_up"))
+                    return
+                await message.answer(t("name_retry"))
+                return
+            name, age = parsed
+            trainer.save_flow(flow, name=name, age=age, phase="bio")
+            await message.answer(t("ask_bio"))
+            return
+
+        if phase == "bio":
+            await _review_text(message, trainer, message.from_user.id, flow, text)
+            return
+
+        # menu / photos: текст не ждём, подсказываем кнопки
+        await message.answer(t("flow_active_hint"))
 
 
 @router.message(F.text)
@@ -492,6 +1147,44 @@ async def on_menu(callback: CallbackQuery) -> None:
         )
 
 
+@router.callback_query(F.data.startswith("profile:"))
+async def on_profile(callback: CallbackQuery) -> None:
+    trainer = _trainer(callback.message)
+    await callback.answer()
+    target = callback.message
+    telegram_id = callback.from_user.id
+    action = (callback.data or "").split(":", 1)[1]
+
+    if action == "start":
+        async with trainer.user_lock(telegram_id):
+            await _run_check(target, trainer, telegram_id)
+        return
+
+    async with trainer.user_lock(telegram_id):
+        flow = trainer.get_profile_flow(telegram_id)
+        if flow is None:
+            return
+        if action == "rework":
+            if flow.check.phase != "menu":
+                return
+            trainer.save_flow(flow, phase="bio")
+            await target.answer(t("rework_hint"))
+        elif action == "to_photos":
+            if flow.check.phase not in ("menu", "photos"):
+                return
+            flow.photo_ids = []
+            trainer.save_flow(flow, phase="photos")
+            await _send_long(target, _privacy_warning(trainer))
+            await target.answer(
+                t("ask_photos", max=cfg_max_photos()), reply_markup=_photos_keyboard()
+            )
+        elif action == "evaluate":
+            if flow.check.phase == "photos":
+                await _evaluate_photos(target, trainer, telegram_id, flow)
+        elif action in ("skip_photos", "finish"):
+            await _finish_flow(target, trainer, telegram_id, flow)
+
+
 async def _run(settings: Settings, scenario: Scenario) -> None:
     if not settings.has_telegram:
         raise SystemExit("Нет TELEGRAM_BOT_TOKEN: создай бота у @BotFather и заполни .env")
@@ -514,12 +1207,24 @@ async def _run(settings: Settings, scenario: Scenario) -> None:
         base_url=settings.deepseek_base_url,
         model=settings.deepseek_model,
     )
+    # Vision для «Проверки анкеты»: без ключа фаза фото вежливо откажет.
+    vision = (
+        VisionLLM(
+            api_key=settings.vision_api_key or "",
+            base_url=settings.vision_base_url,
+            model=settings.vision_model,
+        )
+        if settings.has_vision
+        else None
+    )
     storage = Storage(settings.db_path)
     trainer = Trainer(
         DialogueEngine(llm),
         storage,
         scenario,
         settings.safety_resources,
+        vision=vision,
+        settings=settings,
     )
     global _trainer_instance
     _trainer_instance = trainer
@@ -544,6 +1249,8 @@ async def _run(settings: Settings, scenario: Scenario) -> None:
     finally:
         clear_pid()
         await llm.aclose()
+        if vision is not None:
+            await vision.aclose()
         storage.close()
         await bot.session.close()
 

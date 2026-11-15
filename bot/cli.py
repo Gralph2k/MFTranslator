@@ -51,6 +51,9 @@ class DemoLLM:
         if system.startswith("Ты — методист"):
             ids = _RUBRIC_ID.findall(system)
             return _demo_debrief(ids) if ids else self.debrief
+        if system.startswith("Ты — консультант по анкетам"):
+            # Демо «Проверки анкеты»: разбор с зелёным и красным флагом.
+            return json.dumps(_demo_profile_review(), ensure_ascii=False)
         if system.startswith("Ты — наблюдатель"):
             return json.dumps(
                 {
@@ -169,6 +172,81 @@ def _print_profile(scenario) -> None:
         print(profile_text(scenario))
 
 
+def _demo_profile_review() -> dict[str, Any]:
+    """Заготовка разбора анкеты: зелёный и красный флаг, переписанное начало."""
+    return {
+        "verdict": "Анкета живая, но начало звучит как выговор бывшей.",
+        "flags": [
+            {
+                "type": "red",
+                "title": "Негатив в начале",
+                "quote": "меркантильные мимо",
+                "comment": "Обиженный фильтр читается раньше тебя самого — убери, расскажи, чем живёшь.",
+            },
+            {
+                "type": "green",
+                "title": "Конкретика",
+                "comment": "Горы и честный текст про работу — есть за что зацепиться вопросом.",
+            },
+        ],
+        "rewrite": {
+            "before": "Нормальный парень, меркантильные мимо",
+            "after": "Инженер, в выходные — горы: показываю гостям, где лучшая круассанная города",
+        },
+    }
+
+
+async def run_check(provider: str) -> int:
+    """«Проверка анкеты» в терминале: текстовая фаза, фото — только в боте."""
+    from .profile_check import (
+        consultant_messages,
+        parse_name_age,
+        parse_text_review,
+        render_text_review,
+    )
+
+    settings = load_settings()
+    llm = build_llm(provider, settings)
+
+    print("=== Проверка анкеты ===")
+    interactive = sys.stdin.isatty()
+
+    def _ask(prompt: str) -> str:
+        return input(prompt) if interactive else sys.stdin.readline().rstrip("\n")
+
+    parsed = None
+    for _ in range(3):
+        raw = _ask("Имя и возраст («Саша, 32»): ")
+        parsed = parse_name_age(raw)
+        if parsed is not None:
+            break
+        print("Не понял возраст, попробуй ещё раз.")
+    if parsed is None:
+        print("Не вышло. Демо заканчивается.")
+        return 1
+    name, age = parsed
+
+    bio = _ask("Текст анкеты («О себе»): ")
+    if not bio.strip():
+        print("Пустая анкета — нечего разбирать.")
+        return 1
+
+    try:
+        raw = await llm.complete(
+            consultant_messages(name, age, bio), json_mode=True, temperature=0.3
+        )
+        review = parse_text_review(json.loads(raw))
+    except Exception as exc:
+        print(f"[разбор не получился: {exc}]")
+        return 1
+    finally:
+        await llm.aclose()
+
+    print()
+    print(render_text_review(review))
+    return 0
+
+
 async def run(provider: str, scenario_name: str) -> int:
     settings = load_settings()
     scenario = load_scenario(scenario_name)
@@ -260,7 +338,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Локальный прогон сценария")
     parser.add_argument("--provider", choices=["demo", "deepseek"], default="demo")
     parser.add_argument("--scenario", default=story_scenarios()[0])
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="прогон «Проверки анкеты»: текстовая фаза без Telegram",
+    )
     args = parser.parse_args(argv)
+    if args.check:
+        return asyncio.run(run_check(args.provider))
     return asyncio.run(run(args.provider, args.scenario))
 
 
