@@ -126,7 +126,9 @@ def test_heroine_file_has_valid_personality():
     assert len(vera.speech) >= 80
     assert "«" in vera.speech
     assert vera.profile is not None
-    assert len(vera.profile.photos) == 3
+    # Контракт анкеты — минимум 3 фото; у Веры 4 (город/парк, танцы, караоке, море).
+    assert len(vera.profile.photos) >= 3
+    assert set(vera.profile.captions) == set(vera.profile.photos)
 
 
 def test_eva_file_has_four_profile_photos():

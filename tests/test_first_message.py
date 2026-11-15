@@ -34,7 +34,7 @@ def test_chat_scenario_has_profile_and_red_flags(scenario):
     assert scenario.medium == "chat"
     assert not scenario.shows_face, "лица в переписке не видно"
     assert scenario.profile is not None
-    assert len(scenario.profile.photos) == 3
+    assert len(scenario.profile.photos) >= 3
     assert scenario.profile.hobbies or scenario.profile.interests
     assert scenario.red_flags
     assert scenario.opening == ""
@@ -147,7 +147,9 @@ def test_profile_card_images_have_the_app_ui(scenario):
 
     cards = render_profile_cards(scenario)
 
-    assert len(cards) == 3
+    # По карточке на каждое фото анкеты (у Веры их четыре с ноября 2026).
+    assert len(cards) == len(scenario.profile.photos)
+    assert len(cards) >= 3
     for card in cards:
         assert card.is_file()
         assert card.stat().st_size > 10_000
