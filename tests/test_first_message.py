@@ -173,6 +173,22 @@ def test_persona_prompt_has_correspondence_and_red_lines(scenario):
     assert "без нотаций" in prompt
 
 
+def test_persona_prompt_allows_early_finish(scenario):
+    """Лимит ходов - потолок, а не план: героиня может закончить раньше по обстановке."""
+    state = PersonaState.from_mapping(scenario.initial_state)
+    prompt = persona_system_prompt(scenario, state)
+
+    assert "раньше, чем кончатся реплики" in prompt
+    # Он окончательно не нравится - не тяни до лимита.
+    assert "окончательно не нравится" in prompt
+    # Договорились о звонке или встрече - можно тепло попрощаться сразу.
+    assert "уже договорились о звонке или о встрече" in prompt
+    # Он сам прощается - она не удерживает и заканчивает первой.
+    assert "он сам прощается" in prompt
+    # Маркер конца в блоке повторен: без него разговор не закончится.
+    assert "[[конец]]" in prompt
+
+
 def test_meeting_prompt_keeps_the_no_emoji_rule():
     """Вживую лицо видно: смайлики там не нужны и остаются запрещёнными."""
     date = load_scenario("first_date/vera")
@@ -337,7 +353,7 @@ def test_situation_has_no_scoreboard(scenario):
 
 def test_turn_limit_leaves_room_for_wind_down(scenario):
     """Лимит не обрывает разговор: у Веры есть запас на предупреждение и прощание."""
-    assert scenario.turn_limit == 12
+    assert scenario.turn_limit == 20
     assert scenario.wrap_up_at >= 2
     assert scenario.wrap_up_reasons
 

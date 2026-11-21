@@ -22,7 +22,7 @@
     "energy": 0.4,
     "notes": []
   },
-  "turn_limit": 12,
+  "turn_limit": 20,
   "wrap_up": {
     "turns_left": 3,
     "reasons": [

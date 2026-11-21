@@ -21,7 +21,7 @@ def test_call_continues_eva_chat():
     assert scenario.heroine == "eva"
     assert scenario.enabled is True
     assert (scenario.faces_dir / "call.jpg").is_file()
-    assert scenario.turn_limit == 10
+    assert scenario.turn_limit == 20
     assert scenario.max_score == 12
 
 

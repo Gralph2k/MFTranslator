@@ -24,7 +24,7 @@ def test_date_is_in_person_and_standalone():
     assert scenario.heroine == "eva"
     assert scenario.enabled is True
     assert scenario.faces_dir.is_dir()
-    assert scenario.turn_limit == 10
+    assert scenario.turn_limit == 20
     assert scenario.max_score == 12
 
 

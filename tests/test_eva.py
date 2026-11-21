@@ -102,7 +102,7 @@ def test_eva_starts_closed():
     state = _scenario().initial_state
 
     assert state["openness"] <= 0.25
-    assert 8 <= _scenario().turn_limit <= 12
+    assert 8 <= _scenario().turn_limit <= 20
 
 
 def test_eva_demo_replies_are_in_her_voice():

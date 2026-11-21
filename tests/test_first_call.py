@@ -33,7 +33,7 @@ def test_call_has_no_face_and_continues_the_chat(scenario):
     assert scenario.continues == "first_message/vera"
     assert scenario.canon_history
     assert scenario.opening.startswith("Алло")
-    assert scenario.turn_limit == 10
+    assert scenario.turn_limit == 20
     assert len(scenario.rubric) == 6
     assert scenario.max_score == 12
 

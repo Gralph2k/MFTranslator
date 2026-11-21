@@ -19,7 +19,7 @@ def test_scenario_meets_contract(name):
         assert scenario.shows_face, "в сцене вживую лицо показывается"
     assert len(scenario.rubric) == 6, "рубрика - ровно 6 пунктов"
     assert scenario.max_score == 12
-    assert 8 <= scenario.turn_limit <= 12
+    assert 8 <= scenario.turn_limit <= 20
     assert scenario.initial_state["openness"] <= 0.25, "на старте она закрыта"
     assert len(scenario.secrets) >= 3
 
