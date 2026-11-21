@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from .heroines import heroine_for, heroines, next_scenario_id
+from .heroines import heroine_for, heroines
 from .scenario import ScenarioError, load_scenario
 
 
@@ -15,17 +15,11 @@ def scenario_title(scenario_id: str) -> str:
         return scenario_id
 
 
-def heroines_menu(with_check: bool = True) -> InlineKeyboardMarkup:
-    """Главное меню: «Проверка анкеты» первой строкой, ниже — героини.
-
-    `with_check=False` — мостик после проверки: там анкета уже не нужна,
-    зовём сразу к героиням.
-    """
-    rows: list[list[InlineKeyboardButton]] = []
-    if with_check:
-        rows.append(
-            [InlineKeyboardButton(text="Проверка анкеты", callback_data="profile:start")]
-        )
+def heroines_menu() -> InlineKeyboardMarkup:
+    """Главное меню: «Проверка анкеты» первой строкой, ниже — героини."""
+    rows: list[list[InlineKeyboardButton]] = [
+        [InlineKeyboardButton(text="Проверка анкеты", callback_data="profile:start")]
+    ]
     rows.extend(
         [
             InlineKeyboardButton(
@@ -35,15 +29,6 @@ def heroines_menu(with_check: bool = True) -> InlineKeyboardMarkup:
         for heroine in heroines()
     )
     return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-def heroines_pick() -> InlineKeyboardMarkup:
-    """Одна кнопка «Выбрать героиню»: после разбора и после случайного старта."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Выбрать героиню", callback_data="menu:list")]
-        ]
-    )
 
 
 def heroine_menu(heroine_id: str) -> InlineKeyboardMarkup:
@@ -68,25 +53,30 @@ def heroine_menu(heroine_id: str) -> InlineKeyboardMarkup:
 
 
 def after_finish_menu(current: str) -> InlineKeyboardMarkup:
-    """После разбора: продолжить историю или выбрать другую героиню."""
-    following = next_scenario_id(current)
-    rows: list[list[InlineKeyboardButton]] = []
-    if following:
-        next_heroine = heroine_for(following)
-        title = scenario_title(following)
-        label = (
-            f"Продолжить: {next_heroine.name} — {title}"
-            if next_heroine is not None
-            else f"Продолжить: {title}"
-        )
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text=label, callback_data=f"menu:start:{following}"
-                )
-            ]
-        )
-    rows.append(
-        [InlineKeyboardButton(text="Выбрать героиню", callback_data="menu:list")]
-    )
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+    """После разбора: следующий сюжет той же героини или главное меню.
+
+    «Знакомство» и «первый звонок» ведут к следующей сцене героини; её
+    последняя сцена (например, «Первое свидание») замыкает историю — тогда
+    показываем основное меню целиком: анкета плюс выбор героинь.
+    """
+    heroine = heroine_for(current)
+    if heroine is not None and current in heroine.scenarios:
+        index = heroine.scenarios.index(current)
+        if index + 1 < len(heroine.scenarios):
+            following = heroine.scenarios[index + 1]
+            return InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=f"Продолжить: {scenario_title(following)}",
+                            callback_data=f"menu:start:{following}",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="В основное меню", callback_data="menu:main"
+                        )
+                    ],
+                ]
+            )
+    return heroines_menu()

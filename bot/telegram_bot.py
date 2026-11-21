@@ -298,11 +298,16 @@ def _trainer(message: Message) -> Trainer:
     return _trainer_instance
 
 
-async def _send_long(message: Message, text: str) -> None:
-    """Telegram режет сообщения на 4096 символах — делим по строкам."""
+async def _send_long(
+    message: Message, text: str, reply_markup: InlineKeyboardMarkup | None = None
+) -> None:
+    """Telegram режет сообщения на 4096 символах — делим по строкам.
+
+    Клавиатура цепляется к последнему куску.
+    """
     while text:
         if len(text) <= MAX_MESSAGE:
-            await message.answer(text)
+            await message.answer(text, reply_markup=reply_markup)
             return
         cut = text.rfind("\n", 0, MAX_MESSAGE)
         if cut < MAX_MESSAGE // 2:
@@ -404,8 +409,7 @@ async def cmd_start(message: Message) -> None:
     # /start — лендинг бота: что здесь можно и зачем. Сценарий игрок выбирает сам.
     async with trainer.user_lock(message.from_user.id):
         trainer.close_profile_flow(message.from_user.id)
-    await _send_long(message, start_intro())
-    await message.answer("С чего начнём?", reply_markup=heroines_menu())
+    await _send_long(message, start_intro(), reply_markup=heroines_menu())
 
 
 async def _begin(
@@ -914,7 +918,7 @@ async def _finish_flow(
         target,
         final_summary(flow.check.last_text_score, text_advice, photo_score, photo_advice),
     )
-    await target.answer(t("bridge"), reply_markup=heroines_menu(with_check=False))
+    await target.answer(t("bridge"), reply_markup=heroines_menu())
 
 
 async def _handle_photo_batch(
@@ -1132,6 +1136,9 @@ async def on_menu(callback: CallbackQuery) -> None:
     await callback.answer()
 
     action = (callback.data or "").split(":", 1)[1]
+    if action == "main":
+        await callback.message.answer("Главное меню:", reply_markup=heroines_menu())
+        return
     if action == "list":
         await callback.message.answer("Выбери героиню:", reply_markup=heroines_menu())
         return

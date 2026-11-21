@@ -8,7 +8,6 @@ from bot.heroines import (
     heroines,
     heroine_for,
     load_heroine,
-    next_scenario_id,
     random_heroine,
     story_scenarios,
 )
@@ -52,7 +51,7 @@ def test_disabled_scenarios_are_out_of_rotation():
     assert "friday_evening/anya" in all_scenarios()
 
 
-def test_story_chain_walks_through_heroines_and_wraps():
+def test_story_chain_walks_through_heroines():
     assert story_scenarios() == [
         "first_message/vera",
         "first_call/vera",
@@ -61,13 +60,6 @@ def test_story_chain_walks_through_heroines_and_wraps():
         "first_call/eva",
         "first_date/eva",
     ]
-    assert next_scenario_id("first_message/vera") == "first_call/vera"
-    assert next_scenario_id("first_call/vera") == "first_date/vera"
-    assert next_scenario_id("first_date/vera") == "first_message/eva"
-    assert next_scenario_id("first_message/eva") == "first_call/eva"
-    assert next_scenario_id("first_call/eva") == "first_date/eva"
-    assert next_scenario_id("first_date/eva") == "first_message/vera"
-    assert next_scenario_id("нет-такого") == "first_message/vera"
 
 
 def test_heroine_for_scenario():

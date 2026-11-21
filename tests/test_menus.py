@@ -5,7 +5,6 @@ from bot.menus import (
     after_finish_menu,
     heroine_menu,
     heroines_menu,
-    heroines_pick,
     scenario_title,
 )
 
@@ -34,10 +33,12 @@ def test_heroines_menu_lists_only_active_heroines():
 
 
 def test_heroines_menu_without_check_for_bridge():
-    """После проверки анкеты мостик зовёт сразу к героиням."""
-    markup = heroines_menu(with_check=False)
-
-    assert _callbacks(markup) == ["menu:heroine:vera", "menu:heroine:eva"]
+    """Мостик после проверки анкеты — то же главное меню: анкета плюс героини."""
+    assert _callbacks(heroines_menu()) == [
+        "profile:start",
+        "menu:heroine:vera",
+        "menu:heroine:eva",
+    ]
 
 
 def test_heroine_menu_lists_scenarios_in_story_order():
@@ -74,18 +75,25 @@ def test_after_finish_continues_vera_chain():
     markup = after_finish_menu("first_message/vera")
     callbacks = _callbacks(markup)
 
-    assert callbacks[0] == "menu:start:first_call/vera"
-    assert "menu:start:first_call/vera" in callbacks
-    assert "menu:list" in callbacks
-    assert any("Продолжить: Вера" in text for text in _texts(markup))
+    assert callbacks == ["menu:start:first_call/vera", "menu:main"]
+    assert _texts(markup) == [
+        f"Продолжить: {scenario_title('first_call/vera')}",
+        "В основное меню",
+    ]
 
 
-def test_after_date_moves_to_the_next_heroine():
-    markup = after_finish_menu("first_date/vera")
-    callbacks = _callbacks(markup)
+def test_after_vera_call_leads_to_date():
+    assert _callbacks(after_finish_menu("first_call/vera")) == [
+        "menu:start:first_date/vera",
+        "menu:main",
+    ]
 
-    assert callbacks[0] == "menu:start:first_message/eva"
-    assert any("Продолжить: Ева" in text for text in _texts(markup))
+
+def test_after_date_shows_main_menu():
+    """«Первое свидание» — последняя сцена героини: дальше основное меню."""
+    main_menu = _callbacks(heroines_menu())
+    assert _callbacks(after_finish_menu("first_date/vera")) == main_menu
+    assert _callbacks(after_finish_menu("first_date/eva")) == main_menu
 
 
 def test_after_eva_chat_continues_eva_chain():
@@ -93,18 +101,7 @@ def test_after_eva_chat_continues_eva_chain():
     callbacks = _callbacks(markup)
 
     assert callbacks[0] == "menu:start:first_call/eva"
-    assert any("Продолжить: Ева" in text for text in _texts(markup))
-
-
-def test_after_eva_date_returns_to_vera():
-    assert _callbacks(after_finish_menu("first_date/eva"))[0] == "menu:start:first_message/vera"
-
-
-def test_pick_button_opens_the_heroine_list():
-    markup = heroines_pick()
-
-    assert _callbacks(markup) == ["menu:list"]
-    assert _texts(markup) == ["Выбрать героиню"]
+    assert _texts(markup)[0] == "Продолжить: Первый созвон"
 
 
 def test_scenario_title_is_readable():

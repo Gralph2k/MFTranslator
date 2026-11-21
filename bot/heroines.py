@@ -152,20 +152,6 @@ def story_scenarios() -> list[str]:
     return [scenario for heroine in heroines() for scenario in heroine.scenarios]
 
 
-def next_scenario_id(current: str) -> str:
-    """Следующий сценарий истории; после последнего — снова первый.
-
-    Внутри героини идём по порядку сцен, после её последней — к следующей
-    героине. Неизвестный id трактуется как «начнём сначала».
-    """
-    ids = story_scenarios()
-    if not ids:
-        return ""
-    if current not in ids:
-        return ids[0]
-    return ids[(ids.index(current) + 1) % len(ids)]
-
-
 def random_heroine(
     last: str | None = None,
     rng: random.Random | None = None,
