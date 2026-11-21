@@ -12,6 +12,7 @@ from bot.engine import DialogueEngine
 from bot.llm import FakeLLM
 from bot.profile_check import (
     PROFILE_BONUS_TURNS,
+    consultant_messages,
     load_config,
     parse_name_age,
     parse_photo_review,
@@ -69,6 +70,19 @@ def test_parse_name_age_rejects_garbage():
     assert parse_name_age("Саша, 7") is None  # вне диапазона
     assert parse_name_age("32") is None  # нет имени
     assert parse_name_age("") is None
+
+
+def test_consultant_own_rewrite_rule():
+    """Свой прошлый rewrite: без него блока нет, с ним — блок и правило «не критикуй моё»."""
+    system = consultant_messages("Саша", 32, "Текст анкеты")[0]["content"]
+    assert "прошлая рекомендация" not in system
+
+    system = consultant_messages(
+        "Саша", 32, "Текст анкеты", prev_rewrite="Инженер, горы по выходным"
+    )[0]["content"]
+    assert "Твоя прошлая рекомендация" in system
+    assert "Инженер, горы по выходным" in system
+    assert "который ты сам и предложил" in system
 
 
 def test_config_has_limits_and_flags():
@@ -258,6 +272,17 @@ def test_photo_contents_roundtrip(store):
     profile = store.last_completed_profile(user_id)
     assert profile is not None
     assert profile.photo_contents == ["гольф, кадр в рост", "квадроцикл"]
+
+
+def test_last_rewrite_roundtrip(store):
+    """Своя рекомендация переживает рестарт: колонка в базе, поле в объекте."""
+    user_id = store.ensure_user(1)
+    check_id = store.create_profile_check(user_id)
+    store.update_profile_check(check_id, last_rewrite="Инженер, горы по выходным")
+
+    stored = store.get_active_profile_check(user_id)
+    assert stored is not None
+    assert stored.last_rewrite == "Инженер, горы по выходным"
 
 
 def test_profile_checks_deleted_with_user(store):

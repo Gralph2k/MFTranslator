@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS profile_checks (
     last_text_score INTEGER,
     last_text_verdict TEXT NOT NULL DEFAULT '',
     last_photo_verdict TEXT NOT NULL DEFAULT '',
+    last_rewrite TEXT NOT NULL DEFAULT '',
     photo_contents TEXT NOT NULL DEFAULT '[]',
     completed INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
@@ -124,6 +125,9 @@ class StoredProfileCheck:
     # для героинь, чтобы им было о чём спросить. С дефолтом и в конце —
     # после полей без дефолтов.
     photo_contents: list[str] = field(default_factory=list)
+    # Последняя предложенная им правка анкеты (rewrite.after из разбора):
+    # на повторе текст с ней совпадать «разрешено» без критики.
+    last_rewrite: str = ""
 
     @property
     def is_active(self) -> bool:
@@ -185,6 +189,13 @@ class Storage:
             self._conn.execute(
                 "ALTER TABLE profile_checks ADD COLUMN photo_contents TEXT "
                 "NOT NULL DEFAULT '[]'"
+            )
+        # Своя же рекомендованная правка (rewrite): чтобы при повторном разборе
+        # не критиковать текст, который бот сам и предложил.
+        if pc_columns and "last_rewrite" not in pc_columns:
+            self._conn.execute(
+                "ALTER TABLE profile_checks ADD COLUMN last_rewrite TEXT "
+                "NOT NULL DEFAULT ''"
             )
 
     def close(self) -> None:
@@ -384,7 +395,7 @@ class Storage:
         allowed = {
             "phase", "name", "age", "bio", "text_iterations", "photo_reviews",
             "last_text_score", "last_text_verdict", "last_photo_verdict",
-            "photo_contents", "completed",
+            "last_rewrite", "photo_contents", "completed",
         }
         updates = {}
         for key, value in fields.items():
@@ -455,6 +466,7 @@ def _row_to_profile_check(row: sqlite3.Row) -> StoredProfileCheck:
         last_text_verdict=str(row["last_text_verdict"]),
         last_photo_verdict=str(row["last_photo_verdict"]),
         photo_contents=[str(item) for item in contents],
+        last_rewrite=str(row["last_rewrite"] or ""),
         completed=bool(row["completed"]),
         created_at=str(row["created_at"]),
         updated_at=row["updated_at"],

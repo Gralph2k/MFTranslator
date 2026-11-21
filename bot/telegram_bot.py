@@ -689,7 +689,10 @@ async def _review_text(
     await target.answer(t("analyzing_text"))
     try:
         raw = await trainer.engine.llm.complete(
-            consultant_messages(flow.check.name, flow.check.age or 0, bio),
+            consultant_messages(
+                flow.check.name, flow.check.age or 0, bio,
+                prev_rewrite=flow.check.last_rewrite,
+            ),
             json_mode=True,
             temperature=0.3,
         )
@@ -706,6 +709,7 @@ async def _review_text(
         text_iterations=flow.check.text_iterations + 1,
         last_text_score=review.score,
         last_text_verdict=rendered,
+        last_rewrite=review.rewrite_after,
         phase="menu",
     )
     await _send_long(target, rendered)
