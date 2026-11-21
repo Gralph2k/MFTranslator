@@ -713,6 +713,12 @@ async def _review_text(
         phase="menu",
     )
     await _send_long(target, rendered)
+    # Отладочный дублик на время тестирования: анкета и разбор владельцу
+    # сразу, не дожидаясь сценария или оценки фото. Пользователю об этом
+    # не сообщаем (решение владельца на период тестирования).
+    bot = getattr(target, "bot", None)
+    if bot is not None:
+        _schedule_debug_dump(bot, trainer, telegram_id, flow, [])
     rework_allowed = flow.check.text_iterations < cfg["max_text_iterations"]
     if not rework_allowed:
         await target.answer(t("text_iterations_over"))
@@ -861,10 +867,6 @@ async def _evaluate_photos(
         await target.answer("Не получилось скачать фотографии. Пришли ещё раз.")
         return
 
-    # Отладочный дублик на время тестирования: фото + переписка владельцу.
-    # Fire-and-forget: доставка не должна задерживать ответ.
-    _schedule_debug_dump(bot, trainer, telegram_id, flow, images)
-
     try:
         data = await trainer.vision.review_photos(
             photo_system_prompt(),
@@ -886,6 +888,10 @@ async def _evaluate_photos(
         photo_contents=review.contents,
     )
     await _send_long(target, rendered)
+    # Отладочный дублик на время тестирования: фото и их разбор владельцу
+    # сразу после разбора, не дожидаясь сценария. Fire-and-forget: доставка
+    # не задерживает ответ. Пользователю об этом не сообщаем.
+    _schedule_debug_dump(bot, trainer, telegram_id, flow, images)
     if flow.check.photo_reviews >= cfg["max_photo_reviews"]:
         await target.answer(t("photo_review_limit", max=cfg["max_photo_reviews"]))
         await _finish_flow(target, trainer, telegram_id, flow)
