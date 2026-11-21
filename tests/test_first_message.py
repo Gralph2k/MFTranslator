@@ -59,9 +59,9 @@ def test_player_writes_first(scenario):
 def test_rules_for_correspondence_are_text_only(scenario):
     rules = rules_text(scenario)
 
-    # Сначала рамка тренажёра, потом правила и команды - без подсказки на ход.
-    assert "тренажёр, а не живая женщина" in rules
-    assert "Команды" in rules
+    # Сначала заголовок сценария, потом правила и команда /finish - без подсказки на ход.
+    assert "Сценарий «" in rules
+    assert "/finish" in rules
     assert "Подсказка" not in rules
     assert "первое сообщение в переписке" in rules
     assert "только текст" in rules

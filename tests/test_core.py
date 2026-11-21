@@ -56,14 +56,14 @@ def test_backstory_is_separate_from_rules(scenario):
     backstory = backstory_text(scenario)
     rules = rules_text(scenario)
 
-    # Рамка «это тренажёр» - в первом сообщении; описание сцены уже без неё.
-    assert "тренажёр, а не живая женщина" in rules
+    # Заголовок сценария открывает сообщение; описание сцены уже без рамки.
+    assert "Сценарий «" in rules
     assert "тренажёр" not in backstory.lower()
     assert "Что происходит" in backstory
     assert scenario.backstory in backstory
 
     assert "Как играть" in rules
-    assert "Команды" in rules
+    assert "/finish" in rules
     # Команда /state убрана из бота: нечего и подсказывать.
     assert "/state" not in rules
     assert scenario.backstory not in rules, "правила не должны пересказывать предысторию"

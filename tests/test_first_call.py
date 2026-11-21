@@ -41,7 +41,7 @@ def test_call_has_no_face_and_continues_the_chat(scenario):
 def test_rules_for_a_call_forbid_actions(scenario):
     rules = rules_text(scenario)
 
-    assert "тренажёр, а не живая женщина" in rules
+    assert "Сценарий «" in rules
     assert "звонок" in rules.lower()
     assert "только свою речь" in rules
     assert "Протягиваю ей цветок" not in rules
