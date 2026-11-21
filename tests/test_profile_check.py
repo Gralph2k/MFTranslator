@@ -12,7 +12,6 @@ from bot.engine import DialogueEngine
 from bot.llm import FakeLLM
 from bot.profile_check import (
     PROFILE_BONUS_TURNS,
-    final_summary,
     load_config,
     parse_name_age,
     parse_photo_review,
@@ -20,7 +19,6 @@ from bot.profile_check import (
     player_profile_block,
     render_photo_review,
     render_text_review,
-    score_line,
 )
 from bot.prompts import persona_messages, rules_text
 from bot.scenario import load_scenario
@@ -73,12 +71,6 @@ def test_parse_name_age_rejects_garbage():
     assert parse_name_age("") is None
 
 
-def test_score_line_signs():
-    assert score_line(2, 4, 2) == "Счёт: +2 (зелёных: 4, красных: 2)"
-    assert score_line(-3, 1, 4) == "Счёт: -3 (зелёных: 1, красных: 4)"
-    assert score_line(0, 2, 2) == "Счёт: 0 (зелёных: 2, красных: 2)"
-
-
 def test_config_has_limits_and_flags():
     cfg = load_config()
     assert cfg["max_photos"] == 4
@@ -129,7 +121,7 @@ def test_parse_and_render_text_review():
     assert review.greens == 1 and review.reds == 1
 
     text = render_text_review(review)
-    assert "Счёт: 0" in text
+    assert "Счёт" not in text
     assert "Негатив" in text and "«меркантильные мимо»" in text
     assert "Лучше: инженер" in text
 
@@ -138,14 +130,12 @@ def test_parse_and_render_photo_review():
     review = parse_photo_review(json.loads(PHOTO_REVIEW))
     assert len(review.photos) == 2
     assert review.photos[0].keep is True
-    assert review.photos[0].score == 1
-    assert review.photos[1].score == -1
-    assert review.set_score == -1
     assert review.same_person is True
     assert review.contents == ["портрет на улице", "селфи в зеркале лифта"]
 
     text = render_photo_review(review)
-    assert "Фото 1" in text and "Фото 2" in text
+    assert "✅ Фото 1" in text and "❌ Фото 2" in text
+    assert "— +" not in text  # баллов у фото больше нет
     assert "Набор целиком" in text
     assert "Главный совет: Добавь ростовое" in text
     assert "разные люди" not in text  # same_person=True — предупреждения нет
@@ -162,16 +152,6 @@ def test_parse_photo_review_limits_contents_to_expected():
 def test_photo_review_flags_different_people():
     review = parse_photo_review({"photos": [], "set": {}, "same_person": False})
     assert "разные люди" in render_photo_review(review)
-
-
-def test_final_summary_without_bridge():
-    """Резюме без мостика: «Проверь анкету в деле» уходит отдельным сообщением,
-    чтобы не дублироваться."""
-    text = final_summary(2, "Негатив в начале", -1, "Добавь фото в рост")
-    assert "Анкета: +2" in text
-    assert "Фото: -1" in text
-    assert "Что доработать" in text
-    assert load_config()["texts"]["bridge"][:20] not in text
 
 
 # --- промпт героини и ходы -------------------------------------------------
@@ -316,7 +296,7 @@ async def test_flow_from_name_to_text_review(store, monkeypatch):
     assert flow.check.phase == "menu"
     assert flow.check.text_iterations == 1
     assert flow.check.last_text_score == 0
-    assert any("Счёт: 0" in text for text in message.sent)
+    assert all("Счёт" not in text for text in message.sent)
 
 
 async def test_flow_name_retries_give_up(store, monkeypatch):

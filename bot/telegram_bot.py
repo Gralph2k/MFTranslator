@@ -41,7 +41,6 @@ from .profile_check import (
     TextReview,
     compress_photo,
     consultant_messages,
-    final_summary,
     load_config,
     parse_name_age,
     parse_photo_review,
@@ -896,29 +895,10 @@ async def _finish_flow(
     telegram_id: int,
     flow: ProfileFlow,
 ) -> None:
-    """Финальное резюме и мостик к героиням. Лок уже взят."""
-    text_advice = ""
-    if flow.text_review is not None:
-        reds = [flag for flag in flow.text_review.flags if flag.type == "red"]
-        if reds:
-            comment = f" — {reds[0].comment}" if reds[0].comment else ""
-            text_advice = f"{reds[0].title}{comment}"
-        elif flow.text_review.rewrite_after:
-            text_advice = flow.text_review.rewrite_after
-
-    photo_score: int | None = None
-    photo_advice = ""
-    if flow.photo_review is not None:
-        photo_score = flow.photo_review.set_score
-        photo_advice = flow.photo_review.set_advice
-
+    """Меню героинь после проверки анкеты. Лок уже взят."""
     completed = bool(flow.check.bio.strip())
     trainer.close_profile_flow(telegram_id, completed=completed)
-    await _send_long(
-        target,
-        final_summary(flow.check.last_text_score, text_advice, photo_score, photo_advice),
-    )
-    await target.answer(t("bridge"), reply_markup=heroines_menu())
+    await target.answer("Выбери героиню:", reply_markup=heroines_menu())
 
 
 async def _handle_photo_batch(

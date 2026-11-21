@@ -1,12 +1,12 @@
 """«Проверка анкеты»: разбор текста и фото анкеты сайта знакомств.
 
 Отдельный флоу, не сценарий: нет героини, ходов и рубрики — пользователь
-присылает имя/возраст и текст, получает разбор со счётом, затем по желанию
+присылает имя/возраст и текст, получает разбор, затем по желанию
 присылает до 4 фото и получает оценку каждого кадра и набора целиком.
 
-Счёт считает код (+1 зелёный флаг, −1 красный), а не модель: модели плохо
-складывают, а мужчине важен честный счёт. Флаги и тексты промптов лежат
-в `scenarios/profile_check/config.json` — правятся без кода.
+Численный счёт пользователю не показывается — только вердикты, флаги и
+метки ✅/❌; сырой счёт хранится в базе (last_text_score). Флаги и тексты
+промптов лежат в `scenarios/profile_check/config.json` — правятся без кода.
 """
 
 from __future__ import annotations
@@ -97,7 +97,6 @@ class PhotoVerdict:
     keep: bool
     verdict: str
     flags: list[Flag] = field(default_factory=list)
-    score: int = 0
 
 
 @dataclass
@@ -111,19 +110,9 @@ class PhotoReview:
     # для героинь, чтобы им было о чём спросить, а не список претензий.
     contents: list[str] = field(default_factory=list)
 
-    @property
-    def set_score(self) -> int:
-        return _score(self.set_flags)
-
 
 def _score(flags: list[Flag]) -> int:
     return sum(1 if flag.type == "green" else -1 for flag in flags)
-
-
-def score_line(score: int, greens: int, reds: int) -> str:
-    """«Счёт: +2 (зелёных: 4, красных: 2)» — числа важны, знак не сглаживаем."""
-    sign = "+" if score > 0 else ""
-    return f"Счёт: {sign}{score} (зелёных: {greens}, красных: {reds})"
 
 
 def _parse_flags(raw: Any, limit: int = 8) -> list[Flag]:
@@ -231,7 +220,6 @@ def render_text_review(review: TextReview) -> str:
                 "",
             ]
         )
-    lines.append(score_line(review.score, review.greens, review.reds))
     return "\n".join(lines).strip()
 
 
@@ -301,7 +289,6 @@ def parse_photo_review(data: dict[str, Any], expected: int | None = None) -> Pho
                     keep=bool(item.get("keep", True)),
                     verdict=str(item.get("verdict", "")).strip(),
                     flags=flags,
-                    score=_score(flags),
                 )
             )
     raw_set = data.get("set") if isinstance(data.get("set"), dict) else {}
@@ -325,9 +312,9 @@ def parse_photo_review(data: dict[str, Any], expected: int | None = None) -> Pho
 def render_photo_review(review: PhotoReview) -> str:
     lines = []
     for photo in review.photos:
-        mark = "👍" if photo.keep else "👎"
-        sign = "+" if photo.score > 0 else ""
-        lines.append(f"{mark} Фото {photo.index} — {sign}{photo.score}")
+        # Качество кадра — бинарная метка от модели: оставить или заменить.
+        mark = "✅" if photo.keep else "❌"
+        lines.append(f"{mark} Фото {photo.index}")
         if photo.verdict:
             lines.append(photo.verdict)
         for flag in photo.flags:
@@ -349,10 +336,6 @@ def render_photo_review(review: PhotoReview) -> str:
     if review.set_advice:
         lines.append(f"Главный совет: {review.set_advice}")
         lines.append("")
-    greens = sum(1 for flag in review.set_flags if flag.type == "green")
-    lines.append(
-        score_line(review.set_score, greens, len(review.set_flags) - greens)
-    )
     return "\n".join(lines).strip()
 
 
@@ -381,32 +364,6 @@ def player_profile_block(
 списком и не возвращайся к фотографиям в каждом сообщении: одна зацепка за
 разговор, дальше — интерес к нему самому. Не упоминай никакую проверку анкеты.
 """
-
-
-def final_summary(
-    text_score: int | None,
-    text_advice: str,
-    photo_score: int | None,
-    photo_advice: str,
-) -> str:
-    """Финальное резюме прогона: счёты и что доработать.
-
-    Мостик к героиням («Проверь анкету в деле…») живёт отдельным сообщением
-    с кнопками — здесь его не дублируем.
-    """
-    lines = [load_config()["texts"]["final_title"], ""]
-    if text_score is not None:
-        sign = "+" if text_score > 0 else ""
-        lines.append(f"Анкета: {sign}{text_score}")
-    if photo_score is not None:
-        sign = "+" if photo_score > 0 else ""
-        lines.append(f"Фото: {sign}{photo_score}")
-    lines.append("")
-    todo = [item for item in (text_advice, photo_advice) if item]
-    if todo:
-        lines.append("Что доработать:")
-        lines.extend(f"• {item}" for item in todo)
-    return "\n".join(lines)
 
 
 def compress_photo(data: bytes, max_side: int = 768, quality: int = 82) -> bytes:
