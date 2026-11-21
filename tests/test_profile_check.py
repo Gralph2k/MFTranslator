@@ -107,7 +107,7 @@ PROFILE_REVIEW = json.dumps(
              "comment": "Убери фильтр, расскажи о себе."},
             {"type": "green", "title": "Конкретика", "comment": "Горы цепляют."},
         ],
-        "rewrite": {"before": "нормальный парень", "after": "инженер, горы по выходным"},
+        "rewrite": "Инженер, горы по выходным. Ищу ту, с кем интересно спорить.",
     },
     ensure_ascii=False,
 )
@@ -137,7 +137,8 @@ def test_parse_and_render_text_review():
     text = render_text_review(review)
     assert "Счёт" not in text
     assert "Негатив" in text and "«меркантильные мимо»" in text
-    assert "Лучше: инженер" in text
+    assert "Как звучит лучше:" in text and "Было:" not in text
+    assert "Инженер, горы по выходным. Ищу ту, с кем интересно спорить." in text
 
 
 def test_parse_and_render_photo_review():

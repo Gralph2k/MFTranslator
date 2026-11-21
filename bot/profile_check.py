@@ -84,7 +84,6 @@ class Flag:
 class TextReview:
     verdict: str
     flags: list[Flag]
-    rewrite_before: str = ""
     rewrite_after: str = ""
     score: int = 0
     greens: int = 0
@@ -175,14 +174,17 @@ def consultant_messages(
 - Ориентир структуры: крючок в первой строке (характер или юмор), 3–5 конкретик,
   приглашение к диалогу (вопрос или «спорьте со мной»), одна короткая честность
   про важное — без списка «не пиши мне, если…».
-- Если красных флагов нет, rewrite не нужен; если есть — перепиши начало анкеты
-  (2–3 предложения) так, чтобы оно звучало живо и по-настоящему, без штампов.
-- Не выдумывай того, чего нет в тексте.
+- Если красных флагов нет, верни в rewrite пустую строку. Если есть — верни
+  полный текст откорректированной анкеты целиком: сохрани всё удачное, исправь
+  все места с красными флагами, без штампов и в тех же пределах длины.
+  Пользователь скопирует этот текст себе на страницу как есть — без кавычек,
+  пояснений и пометок в самом тексте.
+- Факты — только из его анкеты: ничего не выдумывай и не добавляй от себя.
 
 Верни строго JSON:
 {{"verdict": "1–2 предложения: общее впечатление и главное, что менять",
  "flags": [{{"type": "red", "title": "короткое название", "quote": "цитата из анкеты", "comment": "что не так и как исправить"}}],
- "rewrite": {{"before": "самое слабое место как есть", "after": "как то же самое написать лучше"}}}}"""
+ "rewrite": "полный текст откорректированной анкеты или пустая строка, если правки не нужны"}}"""
     user = f"Анкета.\nИмя: {name}\nВозраст: {age}\nТекст «О себе»:\n{bio}"
     return [
         {"role": "system", "content": system},
@@ -194,12 +196,13 @@ def parse_text_review(data: dict[str, Any]) -> TextReview:
     flags = _parse_flags(data.get("flags"))
     greens = sum(1 for flag in flags if flag.type == "green")
     reds = len(flags) - greens
-    rewrite = data.get("rewrite") if isinstance(data.get("rewrite"), dict) else {}
+    rewrite = data.get("rewrite")
+    if isinstance(rewrite, dict):  # старый формат {before, after}
+        rewrite = rewrite.get("after", "")
     return TextReview(
         verdict=str(data.get("verdict", "")).strip(),
         flags=flags,
-        rewrite_before=str(rewrite.get("before", "")).strip(),
-        rewrite_after=str(rewrite.get("after", "")).strip(),
+        rewrite_after=str(rewrite or "").strip(),
         score=greens - reds,
         greens=greens,
         reds=reds,
@@ -223,15 +226,8 @@ def render_text_review(review: TextReview) -> str:
             comment = f": {flag.comment}" if flag.comment else ""
             lines.append(f"• {flag.title}{comment}")
         lines.append("")
-    if review.rewrite_before and review.rewrite_after:
-        lines.extend(
-            [
-                "Как звучит лучше:",
-                f"Было: {review.rewrite_before}",
-                f"Лучше: {review.rewrite_after}",
-                "",
-            ]
-        )
+    if review.rewrite_after:
+        lines.extend(["Как звучит лучше:", review.rewrite_after, ""])
     return "\n".join(lines).strip()
 
 
