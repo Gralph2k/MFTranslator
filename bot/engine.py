@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from .guards import wrap_player_text
 from .llm import LLM, LLMError, parse_json_object
 from .prompts import END_MARKER, debrief_messages, persona_messages, state_messages
 from .safety import CrisisDetected, detect_crisis
@@ -36,6 +37,13 @@ FAREWELL_ENDINGS = (
 def _ends_with_farewell(text: str) -> bool:
     tail = " ".join(text.split()).rstrip(" .!?…)\"'»").lower()
     return any(tail.endswith(marker) for marker in FAREWELL_ENDINGS)
+
+
+def _ends_with_marker(text: str) -> bool:
+    """Маркер конца засчитывается только в конце текста: модель иногда
+    повторяет [[конец]] по просьбе игрока в середине реплики, и такой
+    маркер сессию закрывать не должен."""
+    return text.rstrip().endswith(END_MARKER)
 
 
 @dataclass
@@ -138,7 +146,7 @@ class DialogueEngine:
         if not text:
             raise ValueError("пустое сообщение")
 
-        session.history.append({"role": "user", "content": text})
+        session.history.append({"role": "user", "content": wrap_player_text(text)})
         session.user_turns += 1
 
         if detect_crisis(text):
@@ -168,14 +176,21 @@ class DialogueEngine:
         reply, embedded_state, ended = _parse_persona_reply(raw)
         # Явный маркер прощания надёжнее наблюдателя: героиня сказала «пока» - сессия
         # закрывается сразу, и следующая реплика игрока уже не обрабатывается.
-        marker_ended = END_MARKER in raw
+        # Маркер считается только в конце реплики: вымоленный командой маркер
+        # в середине текста сессию не закрывает.
+        marker_ended = _ends_with_marker(raw) or _ends_with_marker(reply)
+        if END_MARKER in reply:
+            # Маркер - служебный артефакт: из текста реплики его вырезаем
+            # всегда, чтобы игрок его не видел и не собирал по частям.
+            reply = reply.replace(END_MARKER, "").strip()
         if marker_ended:
             log.info(
                 "сессия %s (%s): героиня закончила разговор маркером",
                 session.session_id,
                 session.scenario.id,
             )
-            reply = reply.replace(END_MARKER, "").strip() or "Пока."
+            if not reply:
+                reply = "Пока."
         farewell_ended = _ends_with_farewell(reply)
         if farewell_ended and not marker_ended:
             log.info(

@@ -87,5 +87,7 @@ async def test_engine_stops_scene_and_does_not_call_model(scenario):
     with pytest.raises(CrisisDetected):
         await engine.reply(session, "Я больше не хочу жить")
 
-    assert session.history[-1] == {"role": "user", "content": "Я больше не хочу жить"}
+    # Сообщение остаётся в стенограмме в разметке игрока - это часть записи разговора.
+    assert session.history[-1]["role"] == "user"
+    assert "Я больше не хочу жить" in session.history[-1]["content"]
     assert session.user_turns == 1

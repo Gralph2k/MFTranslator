@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .guards import MAX_MOOD_LEN, clamp_text, sanitize_note
+
 SCALES = ("trust", "openness", "energy")
 # Доверие и открытость растут медленно: один тёплый ход не переписывает историю.
 # Числа совпадают с правилами в промпте наблюдателя, но здесь они ещё и зажаты.
@@ -54,7 +56,9 @@ class PersonaState:
         if not isinstance(delta, dict):
             return
         if isinstance(delta.get("mood"), str) and delta["mood"].strip():
-            self.mood = delta["mood"].strip()
+            # Лимит длины: mood живёт в каждом промпте, а инъекция не должна
+            # расширять его в абзац команд.
+            self.mood = clamp_text(delta["mood"], MAX_MOOD_LEN)
         for scale in SCALES:
             if scale in delta:
                 current = getattr(self, scale)
@@ -65,7 +69,9 @@ class PersonaState:
         new_notes = delta.get("notes")
         if isinstance(new_notes, list):
             for note in new_notes:
-                text = str(note).strip()
+                # Чистка от тегов и маркера конца: заметка уходит в промпты
+                # следующих ходов и не должна разносить инъекцию дальше.
+                text = sanitize_note(note)
                 if text and text not in self.notes:
                     self.notes.append(text)
             self.notes = self.notes[-MAX_NOTES:]

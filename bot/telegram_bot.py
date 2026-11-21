@@ -555,7 +555,7 @@ def _scenario_report(
         f"Сценарий: {scenario.title} ({scenario.id})\n"
         f"Игрок: tg {telegram_id}\n"
     )
-    transcript = format_transcript(session.history, scenario.persona.name)
+    transcript = format_transcript(session.history, scenario.persona.name, for_model=False)
     return f"{header}\nПереписка:\n{transcript}\n\nРазбор:\n{debrief_text}"
 
 
