@@ -82,7 +82,15 @@ def test_consultant_own_rewrite_rule():
     )[0]["content"]
     assert "Твоя прошлая рекомендация" in system
     assert "Инженер, горы по выходным" in system
-    assert "который ты сам и предложил" in system
+    assert "к собственной рекомендации запрещено" in system
+
+
+def test_consultant_no_flag_minimum_and_factual_rule():
+    """0 флагов - легальный ответ; претензия должна быть фактически верной цитате."""
+    system = consultant_messages("Саша", 32, "Текст анкеты")[0]["content"]
+    assert "0 - нормальный ответ" in system
+    assert "не выдумывай претензии ради минимума" in system
+    assert "Претензия должна быть фактически верной для своей цитаты" in system
 
 
 def test_config_has_limits_and_flags():
