@@ -36,7 +36,7 @@ def _as_datetime(value: str | None) -> datetime | None:
 def format_start(value: str, full: bool = False) -> str:
     moment = _as_datetime(value)
     if moment is None:
-        return "—"
+        return "-"
     pattern = "%d.%m.%Y %H:%M" if full else "%d.%m.%y %H:%M"
     return moment.astimezone(MSK).strftime(pattern)
 
@@ -50,7 +50,7 @@ def duration_minutes(created_at: str, updated_at: str | None) -> int | None:
 
 def format_minutes(minutes: int | None) -> str:
     if minutes is None:
-        return "—"
+        return "-"
     if minutes < 1:
         return "<1 мин"
     hours, rest = divmod(minutes, 60)
@@ -71,7 +71,7 @@ def parse_score(payload: str | None) -> tuple[int, int] | None:
 
 def format_score(payload: str | None) -> str:
     score = parse_score(payload)
-    return f"{score[0]}/{score[1]}" if score is not None else "—"
+    return f"{score[0]}/{score[1]}" if score is not None else "-"
 
 
 def _status(row: SessionOverview) -> str:
@@ -110,7 +110,7 @@ def format_table(rows: list[SessionOverview], total: int | None = None) -> str:
         summary = f"Показаны последние {len(rows)} из {total}."
     else:
         summary = f"Всего сессий: {len(rows)}."
-    lines.extend(["", f"{summary} Номер сессии — ниже, Enter — выход."])
+    lines.extend(["", f"{summary} Номер сессии - ниже, Enter - выход."])
     return "\n".join(lines)
 
 
@@ -167,7 +167,7 @@ def run_interactive(
     read: Callable[[str], str] = input,
     write: Callable[[str], None] = print,
 ) -> None:
-    """Последние 20 сессий, затем ожидание номера. Пустая строка — выход."""
+    """Последние 20 сессий, затем ожидание номера. Пустая строка - выход."""
 
     def show_list() -> None:
         rows = storage.list_overview(limit=LAST_SESSIONS)
@@ -178,7 +178,7 @@ def run_interactive(
     while True:
         write("")
         try:
-            answer = read("Номер сессии (Enter — выход): ").strip()
+            answer = read("Номер сессии (Enter - выход): ").strip()
         except (EOFError, KeyboardInterrupt):
             write("")
             return
@@ -186,7 +186,7 @@ def run_interactive(
             write("")
             return
         if not answer.isdigit():
-            write("Нужен номер сессии — число из таблицы.")
+            write("Нужен номер сессии - число из таблицы.")
             continue
 
         session_id = int(answer)
@@ -204,7 +204,7 @@ def run_interactive(
 
 
 def _utf8_console() -> None:
-    # Консоль Windows по умолчанию не в UTF-8 — иначе русский текст превращается в кашу.
+    # Консоль Windows по умолчанию не в UTF-8 - иначе русский текст превращается в кашу.
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
@@ -216,13 +216,13 @@ def main(argv: list[str] | None = None) -> int:
     _utf8_console()
     parser = argparse.ArgumentParser(
         prog="sessions.cmd",
-        description="Последние 20 диалогов; номер сессии — стенограмма и разбор.",
+        description="Последние 20 диалогов; номер сессии - стенограмма и разбор.",
     )
     parser.add_argument(
         "session_id",
         nargs="?",
         type=int,
-        help="номер сессии; без него — последние 20 и ожидание номера",
+        help="номер сессии; без него - последние 20 и ожидание номера",
     )
     parser.add_argument(
         "--db",

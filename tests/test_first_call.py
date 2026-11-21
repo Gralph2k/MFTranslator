@@ -57,7 +57,7 @@ def test_backstory_mentions_the_phone(scenario):
 
 
 def test_call_prompt_keeps_a_living_voice(scenario):
-    """Созвон — главный риск сухости: голос должен звучать, а не телеграфировать."""
+    """Созвон - главный риск сухости: голос должен звучать, а не телеграфировать."""
     state = PersonaState.from_mapping(scenario.initial_state)
     prompt = persona_system_prompt(scenario, state)
 

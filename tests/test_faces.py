@@ -46,7 +46,7 @@ def test_emotion_is_case_and_yo_insensitive():
 
 
 def test_faces_live_next_to_the_scenario():
-    """Фотографии — часть сценария, а не общая папка на всех."""
+    """Фотографии - часть сценария, а не общая папка на всех."""
     for name in available_scenarios():
         scenario = load_scenario(name)
         assert scenario.dir == SCENARIO_DIR / name
@@ -62,7 +62,7 @@ def test_every_emotion_has_a_picture(name):
 
 
 def test_scenario_without_photos_falls_back_to_text():
-    """Пустая папка — не ошибка: бот просто не шлёт фото."""
+    """Пустая папка - не ошибка: бот просто не шлёт фото."""
     folder = _folder("empty")
     assert face_path("calm", folder) is None
 

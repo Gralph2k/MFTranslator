@@ -43,7 +43,7 @@ def test_session_survives_process_restart(store):
     session.history.append({"role": "user", "content": "Привет"})
     first.persist(telegram_id=7, session=session)
 
-    # Новый экземпляр — как после перезапуска бота: памяти нет, база есть.
+    # Новый экземпляр - как после перезапуска бота: памяти нет, база есть.
     second = _trainer(store)
     loaded = second.get_session(7)
 
@@ -120,7 +120,7 @@ class FakeMessage:
 
 
 async def test_start_shows_landing_without_scenario(store, monkeypatch):
-    """/start — лендинг бота: интро и меню, сценарий не запускается сам."""
+    """/start - лендинг бота: интро и меню, сценарий не запускается сам."""
     trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
     monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
 
@@ -137,7 +137,7 @@ async def test_restart_anti_repeats_the_last_heroine(store, monkeypatch):
     trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
     trainer.start_session(telegram_id=1, scenario_id="first_message/vera")
     # Закрываем разговор и «перезапускаем процесс»: ни активной сцены в базе,
-    # ни копии в памяти — иначе /restart просто повторил бы ту же сцену.
+    # ни копии в памяти - иначе /restart просто повторил бы ту же сцену.
     stored = store.get_active_session(store.ensure_user(1))
     store.save_session(stored.id, stored.state, stored.history, stored.user_turns, finished=True)
     trainer.sessions.pop(1, None)
@@ -247,7 +247,7 @@ async def test_finish_does_not_repeat_an_automatic_debrief(store, monkeypatch):
 
 
 async def test_debrief_is_not_delivered_twice(store, monkeypatch):
-    """Прямой повторный вызов разбора — no-op: ни запроса, ни дубля текста."""
+    """Прямой повторный вызов разбора - no-op: ни запроса, ни дубля текста."""
     llm = FakeLLM([DEBRIEF])
     trainer = Trainer(DialogueEngine(llm), store, load_scenario(), with_faces=False)
     monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)

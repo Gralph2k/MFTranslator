@@ -64,7 +64,7 @@ def test_minutes_are_human_readable():
     assert format_minutes(12) == "12 мин"
     assert format_minutes(60) == "1 ч 00 мин"
     assert format_minutes(135) == "2 ч 15 мин"
-    assert format_minutes(None) == "—"
+    assert format_minutes(None) == "-"
 
 
 def test_duration_runs_from_start_to_last_activity():
@@ -76,8 +76,8 @@ def test_duration_runs_from_start_to_last_activity():
 
 def test_score_is_read_from_the_debrief_header():
     assert format_score("Разбор\nИтог: 8 из 12\n") == "8/12"
-    assert format_score(None) == "—"
-    assert format_score("тут нет итога") == "—"
+    assert format_score(None) == "-"
+    assert format_score("тут нет итога") == "-"
 
 
 def test_table_shows_requested_columns():
@@ -99,7 +99,7 @@ def test_active_session_has_no_score_yet():
     text = format_table([_overview(finished=False, debrief=None)])
 
     assert "активна" in text
-    assert "—" in text
+    assert "-" in text
 
 
 def test_session_details_include_transcript_and_debrief():

@@ -30,7 +30,7 @@ class Settings:
     smtp_port: int
     smtp_user: str | None
     smtp_pass: str | None
-    # Пусто — дублик фото на почту выключен. Время тестирования; вырубить = очистить и рестарт.
+    # Пусто - дублик фото на почту выключен. Время тестирования; вырубить = очистить и рестарт.
     profile_debug_email: str | None
     # Дублик в Telegram-чат владельца: работает там, где SMTP закрыт хостером.
     profile_debug_chat_id: int | None

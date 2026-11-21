@@ -115,7 +115,7 @@ async def check_deepseek(settings: Settings) -> Check:
         return check
 
     check.ok = True
-    check.detail = f"ключ работает, модель по умолчанию — {settings.deepseek_model}"
+    check.detail = f"ключ работает, модель по умолчанию - {settings.deepseek_model}"
     return check
 
 

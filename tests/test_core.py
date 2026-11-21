@@ -40,7 +40,7 @@ def test_unknown_scenario_reports_clearly():
 
 
 def test_scenario_loads_by_id_folder_or_file():
-    """Сценарий — папка, но старый способ «по id» должен работать."""
+    """Сценарий - папка, но старый способ «по id» должен работать."""
     from bot.scenario import SCENARIO_DIR
 
     by_id = load_scenario("first_date/vera")
@@ -56,7 +56,7 @@ def test_backstory_is_separate_from_rules(scenario):
     backstory = backstory_text(scenario)
     rules = rules_text(scenario)
 
-    # Рамка «это тренажёр» — в первом сообщении; описание сцены уже без неё.
+    # Рамка «это тренажёр» - в первом сообщении; описание сцены уже без неё.
     assert "тренажёр, а не живая женщина" in rules
     assert "тренажёр" not in backstory.lower()
     assert "Что происходит" in backstory
@@ -118,7 +118,7 @@ def test_state_guidance_changes_contact_initiative():
 
 
 def test_contact_step_comes_from_scenario():
-    """Шаг к нему — свойство сцены: дома объятие, на свидании продолжение."""
+    """Шаг к нему - свойство сцены: дома объятие, на свидании продолжение."""
     date = load_scenario("first_date/vera")
     open_ = PersonaState(trust=0.8, openness=0.9, energy=0.7)
 
@@ -229,7 +229,7 @@ def test_parse_json_object_handles_code_fences():
 
 
 def test_parse_json_object_strips_talk_around_json():
-    assert parse_json_object('Вот ответ: {"a": 1} — как просил') == {"a": 1}
+    assert parse_json_object('Вот ответ: {"a": 1} - как просил') == {"a": 1}
 
 
 async def test_failed_reply_does_not_consume_a_turn(scenario):
@@ -293,7 +293,7 @@ async def test_reply_updates_state_and_history(scenario):
     assert session.user_turns == 1
     assert session.history[-2]["role"] == "user"
     assert session.history[-1] == {"role": "assistant", "content": "Нормально всё."}
-    # Реплика — обычным текстом, состояние — отдельным JSON-запросом.
+    # Реплика - обычным текстом, состояние - отдельным JSON-запросом.
     assert llm.calls[0]["json_mode"] is False
     assert llm.calls[1]["json_mode"] is True
 
@@ -344,7 +344,7 @@ async def test_debrief_scores_are_clamped(scenario):
             "strengths": ["Ты заметил."],
             "growth": ["Меньше вопросов подряд."],
             "moments": [{"quote": "Ты как?", "why": "Слишком общее."}],
-            "rewrite": {"original": "Успокойся", "better": "Я рядом, хочешь — расскажешь."},
+            "rewrite": {"original": "Успокойся", "better": "Я рядом, хочешь - расскажешь."},
             "next_time": "Назвать чувство и замолчать.",
         },
         ensure_ascii=False,
@@ -371,7 +371,7 @@ async def test_debrief_scores_are_clamped(scenario):
 
     text = debrief.render(scenario)
     assert "4 из 12" in text
-    assert "Заметил состояние — 2/2" in text
+    assert "Заметил состояние - 2/2" in text
     assert "Успокойся" in text
 
 
@@ -404,7 +404,7 @@ async def test_demo_llm_tells_dialogue_from_debrief(scenario):
 
 async def test_demo_llm_routes_by_role_not_by_substring():
     """В трейтах Евы есть «наблюдательности»: персонаж не должен из-за этого
-    превращаться в JSON наблюдателя — маршрут демо ищет по началу промпта роли."""
+    превращаться в JSON наблюдателя - маршрут демо ищет по началу промпта роли."""
     from bot.cli import DemoLLM, _demo_debrief
     from bot.prompts import persona_messages
     from bot.scenario import load_scenario

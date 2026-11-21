@@ -5,11 +5,11 @@
 
 ## Как работать (порядок важен)
 
-1. **Сгенерируйте эталон** — шаг 1. Это единственный раз, когда лицо создаётся с нуля.
-2. **Выберите лучший вариант** из 3–4 попыток. Дальше он — референс для всех остальных.
-3. **Меняйте только эмоцию** — шаг 2 + нужный промпт из шага 3, всегда прикрепляя эталон
+1. **Сгенерируйте эталон** - шаг 1. Это единственный раз, когда лицо создаётся с нуля.
+2. **Выберите лучший вариант** из 3-4 попыток. Дальше он - референс для всех остальных.
+3. **Меняйте только эмоцию** - шаг 2 + нужный промпт из шага 3, всегда прикрепляя эталон
    как изображение-референс. Не перегенерируйте лицо заново, иначе оно «поплывёт».
-4. На каждую эмоцию генерируйте 2–4 варианта: мимика — лотерея даже у хорошей модели.
+4. На каждую эмоцию генерируйте 2-4 варианта: мимика - лотерея даже у хорошей модели.
 
 ## Шаг 1. Эталонный портрет
 
@@ -21,7 +21,7 @@ Dark chestnut-brown hair, shoulder length, soft side-swept fringe across the for
 a few loose strands framing the face. She wears a cream oversized knit sweater.
 Plain warm greige background (#EFE7E3). Soft diffused light from the upper left,
 gentle cel shading, clean thin line art, muted warm palette, no harsh highlights.
-Expression: calm and attentive — relaxed eyebrows, eyes open at a normal width,
+Expression: calm and attentive - relaxed eyebrows, eyes open at a normal width,
 lips closed in a neutral line, gaze directly at the viewer.
 Centered composition at eye level, 1:1 square framing, high detail on the face.
 No text, no watermark, no logo.
@@ -44,7 +44,7 @@ do not change the pose. Square 1:1. No text, no watermark.
 
 ## Шаг 3. Восемь эмоций
 
-### 1. Спокойно — `calm`
+### 1. Спокойно - `calm`
 Базовое состояние, с него начинается диалог.
 
 ```
@@ -53,7 +53,7 @@ at a normal width, mouth closed with a barely visible soft smile, gaze directly 
 the viewer.
 ```
 
-### 2. Устала — `tired`
+### 2. Устала - `tired`
 После тяжёлого дня, когда она говорит «всё нормально».
 
 ```
@@ -62,7 +62,7 @@ eyebrows flat with the inner ends a little raised, mouth slightly open as if exh
 head tilted a few degrees to one side, faint shadows under the eyes.
 ```
 
-### 3. Раздражена — `irritated`
+### 3. Раздражена - `irritated`
 На «успокойся» и непрошеные советы.
 
 ```
@@ -70,7 +70,7 @@ irritated and tense: eyebrows pulled down and together, eyes narrowed, pupils sl
 smaller, lips pressed into a thin line, jaw tight, faint flush on the cheeks.
 ```
 
-### 4. Обижена — `hurt`
+### 4. Обижена - `hurt`
 Её задели, но она ещё держится.
 
 ```
@@ -78,7 +78,7 @@ hurt and offended: inner ends of the eyebrows raised, eyes wide and glistening w
 unshed tears, mouth small and downturned, chin slightly lowered, gaze at the viewer.
 ```
 
-### 5. Закрылась — `closed`
+### 5. Закрылась - `closed`
 Партнёр давит или обесценивает; она уходит в себя.
 
 ```
@@ -86,7 +86,7 @@ closed off and guarded: eyes looking away to the side, eyelids lowered, lips a f
 line, head turned slightly away from the viewer, shoulders a little hunched.
 ```
 
-### 6. Теплеет — `warming`
+### 6. Теплеет - `warming`
 Он замолчал и просто посидел рядом; лёд тронулся.
 
 ```
@@ -94,7 +94,7 @@ softening: eyebrows relaxed, eyelids slightly lowered in a gentle look, faint wa
 smile with lips together, soft blush on the cheeks, gaze at the viewer.
 ```
 
-### 7. Улыбается — `smiling`
+### 7. Улыбается - `smiling`
 Её услышали, стало легче.
 
 ```
@@ -102,16 +102,16 @@ a genuine warm smile: eyes curved with happiness, cheeks raised, lips parted in 
 natural smile showing a hint of teeth, eyebrows relaxed.
 ```
 
-### 8. Слёзы — `tears`
+### 8. Слёзы - `tears`
 Она наконец рассказала, и её прорвало.
 
 ```
 crying quietly: eyes wet and shining, one tear running down her cheek, inner eyebrows
-raised, lips trembling slightly and slightly parted, chin lowered, restrained —
+raised, lips trembling slightly and slightly parted, chin lowered, restrained -
 no sobbing, no exaggerated drama.
 ```
 
-### 9. Настороженная — `guarded`
+### 9. Настороженная - `guarded`
 Ждёт подвоха: проверяет, цепляется за детали.
 
 ```
@@ -120,7 +120,7 @@ together with the inner ends a little raised, lips pressed and turned down at th
 chin lowered, head turned away by a few degrees, shoulders tense.
 ```
 
-### 10. Смеётся — `laughing`
+### 10. Смеётся - `laughing`
 Стало легко, шутка попала.
 
 ```
@@ -131,8 +131,8 @@ in a genuine laugh, cheeks raised, faint blush on the cheeks.
 ## Настройки и запреты
 
 - Соотношение сторон: **1:1**, размер 1024×1024.
-- Фон всегда один и тот же — `#EFE7E3`, без предметов и размытия.
-- Свет всегда сверху-слева, стиль — плоская аниме-графика с мягкой заливкой.
+- Фон всегда один и тот же - `#EFE7E3`, без предметов и размытия.
+- Свет всегда сверху-слева, стиль - плоская аниме-графика с мягкой заливкой.
 - Запрещено: текст, подписи, водяные знаки, логотипы, украшения, другая одежда,
   другая причёска, фотореализм, 3D, смена возраста и цвета глаз.
 
@@ -140,7 +140,7 @@ in a genuine laugh, cheeks raised, faint blush on the cheeks.
 
 - Прикрепите эталон ещё раз и добавьте: `Do not redraw the face. Keep the exact same
   facial features as the reference; only the expression may change.`
-- Уменьшите формулировку эмоции до одной фразы — длинные описания модель часто
+- Уменьшите формулировку эмоции до одной фразы - длинные описания модель часто
   трактует как разрешение менять внешность.
 - Сгенерируйте 4 варианта и выберите тот, где совпадают форма глаз и линия бровей.
 - Храните файлы с именами `anya_calm.png`, `anya_tired.png` и так далее.
@@ -149,4 +149,4 @@ in a genuine laugh, cheeks raised, faint blush on the cheeks.
 
 Когда картинки будут готовы, их можно привязать к состоянию: `calm` при открытости
 ниже 0.3, `warming` при росте, `hurt`/`closed` после давления, `tears` при сильном
-сближении. Промпты для этого не нужны — нужны только имена файлов.
+сближении. Промпты для этого не нужны - нужны только имена файлов.

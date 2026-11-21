@@ -26,7 +26,7 @@ fi
 
 echo "[1/6] Пакеты и Python 3.12"
 # В Ubuntu 22.04 по умолчанию Python 3.10, а проекту нужно >= 3.12:
-# берём 3.12 из deadsnakes. Альтернатива без PPA — uv, см. deploy/DEPLOY.md.
+# берём 3.12 из deadsnakes. Альтернатива без PPA - uv, см. deploy/DEPLOY.md.
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 apt-get install -y -q python3 software-properties-common ca-certificates sqlite3 sudo fonts-dejavu-core
@@ -39,13 +39,13 @@ if ! getent group "$SERVICE_USER" >/dev/null 2>&1; then
     groupadd --system "$SERVICE_USER"
 fi
 if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
-    # Домашний каталог уже существует — создавать его useradd не нужно.
+    # Домашний каталог уже существует - создавать его useradd не нужно.
     useradd --system --home-dir "$APP_DIR" --shell /usr/sbin/nologin \
         --no-create-home --gid "$SERVICE_USER" "$SERVICE_USER"
 fi
 chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
 chmod 750 "$APP_DIR"
-# Архив, собранный на Windows, приносит файлы с правами 666 — код стал бы доступен
+# Архив, собранный на Windows, приносит файлы с правами 666 - код стал бы доступен
 # на запись всем. Нормализуем; .venv и data не трогаем, у них свои права.
 for folder in bot deploy scenarios tests prompts; do
     if [ -d "$APP_DIR/$folder" ]; then
@@ -75,7 +75,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
     sudo -u "$SERVICE_USER" -H cp "$APP_DIR/.env.example" "$APP_DIR/.env"
     chmod 600 "$APP_DIR/.env"
     chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/.env"
-    echo "    Создан $APP_DIR/.env — впиши TELEGRAM_BOT_TOKEN, DEEPSEEK_API_KEY,"
+    echo "    Создан $APP_DIR/.env - впиши TELEGRAM_BOT_TOKEN, DEEPSEEK_API_KEY,"
     echo "    SAFETY_RESOURCES: nano $APP_DIR/.env"
 fi
 
@@ -103,6 +103,6 @@ if grep -q '^TELEGRAM_BOT_TOKEN=.\+' "$APP_DIR/.env" \
     echo "Бот запущен. Статус: systemctl status $SERVICE_NAME"
     echo "Логи:              journalctl -u $SERVICE_NAME -f"
 else
-    echo "Ключи в $APP_DIR/.env пока пустые — сервис не включаю."
+    echo "Ключи в $APP_DIR/.env пока пустые - сервис не включаю."
     echo "Впиши ключи и запусти скрипт ещё раз."
 fi

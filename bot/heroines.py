@@ -1,6 +1,6 @@
 """Героини: одна личность на все сценарии.
 
-Героиня — это и есть человек: имя, возраст, профессия, характер, голос и анкета.
+Героиня - это и есть человек: имя, возраст, профессия, характер, голос и анкета.
 Она живёт один раз в `heroines/<slug>/heroine.json`, а сценарии ссылаются на неё
 полем `heroine`. Так Вера в переписке, на созвоне и на свидании остаётся одной и
 той же, а не тремя похожими женщинами.
@@ -61,8 +61,8 @@ class Heroine:
 
     @property
     def menu_title(self) -> str:
-        """Подпись кнопки: «Вера, 30 — редактор в небольшом издательстве»."""
-        return f"{self.name}, {self.age} — {self.job}"
+        """Подпись кнопки: «Вера, 30 - редактор в небольшом издательстве»."""
+        return f"{self.name}, {self.age} - {self.job}"
 
 
 def load_heroine(slug: str) -> HeroineData:
@@ -77,7 +77,7 @@ def load_heroine(slug: str) -> HeroineData:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise ScenarioError(f"{path}: битый JSON — {exc}") from exc
+        raise ScenarioError(f"{path}: битый JSON - {exc}") from exc
     if not isinstance(data, dict):
         raise ScenarioError(f"{path}: ожидался объект JSON")
 
@@ -111,7 +111,7 @@ def load_heroine(slug: str) -> HeroineData:
 def heroines() -> list[Heroine]:
     """Героини, у которых есть хотя бы один включённый сценарий.
 
-    Порядок — по `order` из `heroine.json`, сцены внутри — по `order` сценария.
+    Порядок - по `order` из `heroine.json`, сцены внутри - по `order` сценария.
     """
     by_slug: dict[str, list[Any]] = {}
     for scenario_id in available_scenarios():
@@ -140,7 +140,7 @@ def heroines() -> list[Heroine]:
 
 
 def heroine_for(scenario_id: str) -> Heroine | None:
-    """Героиня, которой принадлежит сценарий; None — если такого нет."""
+    """Героиня, которой принадлежит сценарий; None - если такого нет."""
     for heroine in heroines():
         if scenario_id in heroine.scenarios:
             return heroine

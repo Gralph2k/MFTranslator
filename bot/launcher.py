@@ -30,7 +30,7 @@ STOP_TIMEOUT = 5.0
 
 
 def read_pid(path: Path | None = None) -> int | None:
-    """Читает PID из файла. Битый или пустой файл — это просто «нет PID»."""
+    """Читает PID из файла. Битый или пустой файл - это просто «нет PID»."""
     path = PID_FILE if path is None else path
     try:
         text = path.read_text(encoding="utf-8").strip()
@@ -156,7 +156,7 @@ def pick_bot_pids(
 
 
 def find_bot_pids() -> tuple[list[int], str]:
-    """Ищет запущенные боты. Второй элемент — чем искали, для сообщения."""
+    """Ищет запущенные боты. Второй элемент - чем искали, для сообщения."""
     processes = list_python_processes()
     if processes is not None:
         return pick_bot_pids(processes), "WMI"
@@ -208,7 +208,7 @@ def _telegram_pids() -> list[int]:
 
 
 def _looks_like_python(pid: int) -> bool:
-    """Проверяет, что PID — Python, а не, скажем, Telegram Desktop."""
+    """Проверяет, что PID - Python, а не, скажем, Telegram Desktop."""
     path = _process_path(pid)
     if path:
         return Path(path).name.lower().startswith("python")
@@ -264,7 +264,7 @@ def _process_path(pid: int) -> str | None:
 
 def _terminate(pid: int) -> None:
     if os.name == "nt":
-        # taskkill умеет дерево процессов: .venv-лаунчер и базовый Python — разные PID.
+        # taskkill умеет дерево процессов: .venv-лаунчер и базовый Python - разные PID.
         try:
             result = subprocess.run(
                 ["taskkill", "/PID", str(pid), "/T", "/F"],
@@ -304,7 +304,7 @@ def _terminate(pid: int) -> None:
 
 
 def stop_previous() -> int:
-    """Закрывает все найденные экземпляры бота. 0 — можно запускать нового."""
+    """Закрывает все найденные экземпляры бота. 0 - можно запускать нового."""
     pids, source = find_bot_pids()
     if not pids:
         clear_pid()
@@ -314,7 +314,7 @@ def stop_previous() -> int:
                 "Если старый бот ещё открыт, закрой его вручную."
             )
         else:
-            print("Предыдущий бот не найден — запускаю нового.")
+            print("Предыдущий бот не найден - запускаю нового.")
         return 0
 
     print(f"Останавливаю предыдущего бота: PID {', '.join(map(str, pids))} ({source}).")

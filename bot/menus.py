@@ -16,7 +16,7 @@ def scenario_title(scenario_id: str) -> str:
 
 
 def heroines_menu() -> InlineKeyboardMarkup:
-    """Главное меню: «Проверка анкеты» первой строкой, ниже — героини."""
+    """Главное меню: «Проверка анкеты» первой строкой, ниже - героини."""
     rows: list[list[InlineKeyboardButton]] = [
         [InlineKeyboardButton(text="Проверка анкеты", callback_data="profile:start")]
     ]
@@ -56,7 +56,7 @@ def after_finish_menu(current: str) -> InlineKeyboardMarkup:
     """После разбора: следующий сюжет той же героини или главное меню.
 
     «Знакомство» и «первый звонок» ведут к следующей сцене героини; её
-    последняя сцена (например, «Первое свидание») замыкает историю — тогда
+    последняя сцена (например, «Первое свидание») замыкает историю - тогда
     показываем основное меню целиком: анкета плюс выбор героинь.
     """
     heroine = heroine_for(current)

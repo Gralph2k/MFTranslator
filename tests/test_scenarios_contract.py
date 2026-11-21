@@ -17,7 +17,7 @@ def test_scenario_meets_contract(name):
     assert scenario.medium in {"in_person", "chat", "call"}
     if scenario.medium == "in_person":
         assert scenario.shows_face, "в сцене вживую лицо показывается"
-    assert len(scenario.rubric) == 6, "рубрика — ровно 6 пунктов"
+    assert len(scenario.rubric) == 6, "рубрика - ровно 6 пунктов"
     assert scenario.max_score == 12
     assert 8 <= scenario.turn_limit <= 12
     assert scenario.initial_state["openness"] <= 0.25, "на старте она закрыта"
@@ -35,18 +35,18 @@ def test_scenario_meets_contract(name):
     # которая живёт вместе, и врёт про первое свидание.
     assert scenario.frame, "нужна рамка разговора"
     assert scenario.contact_hint, "нужно, что значит шаг к ней в этой сцене"
-    # Сценарий — папка: рядом со scenario.json лежит images/ с фотографиями.
+    # Сценарий - папка: рядом со scenario.json лежит images/ с фотографиями.
     assert scenario.dir.is_dir(), "нет папки сценария"
     assert scenario.faces_dir.is_dir(), "нет папки для фотографий"
-    # id — путь под scenarios/: папка и id не разъезжаются.
+    # id - путь под scenarios/: папка и id не разъезжаются.
     assert scenario.id == scenario.dir.relative_to(SCENARIO_DIR).as_posix()
     assert scenario.id not in SCENARIO_ID_ALIASES, "id должен быть новым, а не алиасом"
 
-    # По скилу ловушка пишется как «ход — почему кажется разумным и что ломает».
+    # По скилу ловушка пишется как «ход - почему кажется разумным и что ломает».
     for hurt in scenario.hurts:
-        assert "—" in hurt and len(hurt) > 60, f"ловушка без объяснения: {hurt}"
+        assert "-" in hurt and len(hurt) > 60, f"ловушка без объяснения: {hurt}"
 
-    # Среди рабочих ходов должна быть граница — просьба о ясности или отказ.
+    # Среди рабочих ходов должна быть граница - просьба о ясности или отказ.
     assert any(
         ("скажи" in help_.lower() or "границ" in help_.lower())
         for help_ in scenario.helps
@@ -73,7 +73,7 @@ def test_scenario_meets_contract(name):
         )
         assert load_scenario(scenario.continues), "продолжение ссылается на живой сценарий"
 
-    # Созвон: лица нет, анкеты уже нет, а экран звонка — единственная картинка.
+    # Созвон: лица нет, анкеты уже нет, а экран звонка - единственная картинка.
     if scenario.medium == "call":
         assert not scenario.shows_face, "на созвоне лица не видно"
         assert scenario.profile is None, "у созвона не может быть карточки анкеты"
@@ -82,14 +82,14 @@ def test_scenario_meets_contract(name):
 
 @pytest.mark.parametrize("name", all_scenarios())
 def test_profile_scenarios_meet_contract(name):
-    """Анкета — признак переписки: игрок начинает первым, фото не путаются с эмоциями."""
+    """Анкета - признак переписки: игрок начинает первым, фото не путаются с эмоциями."""
     scenario = load_scenario(name)
     if scenario.profile is None:
         return
 
     assert scenario.is_correspondence
     assert scenario.medium == "chat"
-    assert not scenario.shows_face, "в переписке лица не видно — только текст и смайлики"
+    assert not scenario.shows_face, "в переписке лица не видно - только текст и смайлики"
     assert scenario.opening == "", "переписку начинает игрок"
     assert len(scenario.profile.photos) >= 3, "в анкете нужно минимум 3 фото"
     assert scenario.profile.about, "в анкете нужен текст о себе"
@@ -103,7 +103,7 @@ def test_profile_scenarios_meet_contract(name):
     for photo in scenario.profile.photos:
         assert photo.split(".")[0] not in EMOTIONS, f"фото анкеты спорит с эмоцией: {photo}"
 
-    # Подписи — только к существующим фото; их можно не задавать.
+    # Подписи - только к существующим фото; их можно не задавать.
     assert set(scenario.profile.captions) <= set(scenario.profile.photos)
 
 

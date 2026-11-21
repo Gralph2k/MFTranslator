@@ -73,7 +73,7 @@ def test_parse_name_age_rejects_garbage():
 
 
 def test_consultant_own_rewrite_rule():
-    """Свой прошлый rewrite: без него блока нет, с ним — блок и правило «не критикуй моё»."""
+    """Свой прошлый rewrite: без него блока нет, с ним - блок и правило «не критикуй моё»."""
     system = consultant_messages("Саша", 32, "Текст анкеты")[0]["content"]
     assert "прошлая рекомендация" not in system
 
@@ -150,14 +150,14 @@ def test_parse_and_render_photo_review():
 
     text = render_photo_review(review)
     assert "✅ Фото 1" in text and "❌ Фото 2" in text
-    assert "— +" not in text  # баллов у фото больше нет
+    assert "- +" not in text  # баллов у фото больше нет
     assert "Набор целиком" in text
     assert "Главный совет: Добавь ростовое" in text
-    assert "разные люди" not in text  # same_person=True — предупреждения нет
+    assert "разные люди" not in text  # same_person=True - предупреждения нет
 
 
 def test_parse_photo_review_limits_contents_to_expected():
-    """Модель дорисовала contents за несуществующие кадры — режем по expected."""
+    """Модель дорисовала contents за несуществующие кадры - режем по expected."""
     review = parse_photo_review(
         {"photos": [], "set": {}, "contents": ["а", "б", "в", "г", "д"]}, expected=2
     )
@@ -205,7 +205,7 @@ def test_persona_prompt_gets_profile_block():
 
 
 def test_rules_text_does_not_mention_turn_count():
-    """Количество сообщений в правилах не называется: лимит — страховка движка,
+    """Количество сообщений в правилах не называется: лимит - страховка движка,
     а не условие игры; игрок, считающий ходы, играет в счётчик."""
     scenario = load_scenario("first_message/vera")
     text = rules_text(scenario)
@@ -347,7 +347,7 @@ async def test_flow_survives_restart_in_text_phase(store, monkeypatch):
     flow = trainer.get_profile_flow(1)
     trainer.save_flow(flow, name="Саша", age=32, phase="bio")
 
-    # Новый Trainer — как после рестарта процесса: флоу поднимается из базы.
+    # Новый Trainer - как после рестарта процесса: флоу поднимается из базы.
     second = _trainer(store)
     monkeypatch.setattr(telegram_bot, "_trainer_instance", second)
     restored = second.get_profile_flow(1)
@@ -416,7 +416,7 @@ class FakeBot:
 
 async def test_debug_dump_photos_and_split_text():
     bot = FakeBot()
-    long_text = "строка про анкету\n" * 800  # ~14К знаков — больше лимита Telegram
+    long_text = "строка про анкету\n" * 800  # ~14К знаков - больше лимита Telegram
 
     await telegram_bot._send_debug_dump(bot, 42, "Анкета: Саша (32)", long_text, [b"img1", b"img2"])
 
@@ -462,7 +462,7 @@ def _settings(vision_base_url: str, vision_model: str):
 
 
 def test_privacy_warning_names_real_provider(store):
-    """Провайдер в предупреждении — из настроек: GLM на проде, без OpenRouter."""
+    """Провайдер в предупреждении - из настроек: GLM на проде, без OpenRouter."""
     trainer = Trainer(
         DialogueEngine(FakeLLM([])), store, load_scenario(),
         with_faces=False, settings=_settings("https://api.z.ai/api/paas/v4", "glm-4.6v"),

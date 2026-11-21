@@ -1,38 +1,38 @@
 # Фотографии Евы на первом свидании
 
-Папка сценария `first_date/eva` — первая встреча вживую: кафе, четверг, вечер.
-В отличие от переписки и созвона, здесь игрок видит лицо —
+Папка сценария `first_date/eva` - первая встреча вживую: кафе, четверг, вечер.
+В отличие от переписки и созвона, здесь игрок видит лицо -
 бот подставляет кадр настроения (`bot/faces.py`) к репликам Евы.
 
 ## Куда положить кадры
 
 ```
-scenarios/first_date/eva/images/calm.jpg       — спокойно
-scenarios/first_date/eva/images/guarded.jpg    — насторожена (главная эмоция сцены)
-scenarios/first_date/eva/images/closed.jpg     — закрылась
-scenarios/first_date/eva/images/irritated.jpg  — раздражена
-scenarios/first_date/eva/images/hurt.jpg       — обижена
-scenarios/first_date/eva/images/warming.jpg    — теплеет
-scenarios/first_date/eva/images/smiling.jpg    — улыбается
-scenarios/first_date/eva/images/laughing.jpg   — смеётся
-scenarios/first_date/eva/images/tired.jpg      — устала
-scenarios/first_date/eva/images/tears.jpg      — на глазах слёзы
+scenarios/first_date/eva/images/calm.jpg       - спокойно
+scenarios/first_date/eva/images/guarded.jpg    - насторожена (главная эмоция сцены)
+scenarios/first_date/eva/images/closed.jpg     - закрылась
+scenarios/first_date/eva/images/irritated.jpg  - раздражена
+scenarios/first_date/eva/images/hurt.jpg       - обижена
+scenarios/first_date/eva/images/warming.jpg    - теплеет
+scenarios/first_date/eva/images/smiling.jpg    - улыбается
+scenarios/first_date/eva/images/laughing.jpg   - смеётся
+scenarios/first_date/eva/images/tired.jpg      - устала
+scenarios/first_date/eva/images/tears.jpg      - на глазах слёзы
 ```
 
 Промпты, замороженная внешность (веснушки, зелёно-карие глаза, светлый блонд
 в низком хвосте, серьга в левом ухе), бордовое платье с кардиганом и фон кафе
 как якоря идентичности, негативные ограничения и что проверять после
-генерации — в
+генерации - в
 [prompts/eva-call-date-nano-banana.md](../../../prompts/eva-call-date-nano-banana.md).
 
-Стиль — фотореализм, как во всей серии Евы. Не смешивать с референсами Веры
+Стиль - фотореализм, как во всей серии Евы. Не смешивать с референсами Веры
 и Ани (аниме): иначе лицо «поплывёт» в чужой стиль.
 
 ## Пока фото нет
 
 Это не ошибка. `bot/faces.py` просто не отправляет картинку и работает дальше:
 сцена не ломается, реплики и разбор остаются на месте. После генерации файлы
-кладутся в эту папку — правок кода не нужно.
+кладутся в эту папку - правок кода не нужно.
 
 ## Кадров анкеты здесь нет
 

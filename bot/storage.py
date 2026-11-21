@@ -1,6 +1,6 @@
 """SQLite: пользователи, сессии, разборы, проверки анкеты.
 
-Храним минимум: стенограмму, состояние и — для «Проверки анкеты» — текст,
+Храним минимум: стенограмму, состояние и - для «Проверки анкеты» - текст,
 который пользователь сам прислал для разбора. Никаких догадок о реальной
 жизни пользователя: только то, что он принёс сам.
 """
@@ -105,7 +105,7 @@ class SessionOverview:
 
 @dataclass
 class StoredProfileCheck:
-    """Прогон «Проверки анкеты»: текст живёт в базе, фото — никогда."""
+    """Прогон «Проверки анкеты»: текст живёт в базе, фото - никогда."""
 
     id: int
     user_id: int
@@ -122,7 +122,7 @@ class StoredProfileCheck:
     created_at: str
     updated_at: str | None
     # Что на его фото, нейтрально (JSON-список коротких описаний): выжимка
-    # для героинь, чтобы им было о чём спросить. С дефолтом и в конце —
+    # для героинь, чтобы им было о чём спросить. С дефолтом и в конце -
     # после полей без дефолтов.
     photo_contents: list[str] = field(default_factory=list)
     # Последняя предложенная им правка анкеты (rewrite.after из разбора):
@@ -156,7 +156,7 @@ class Storage:
         if "updated_at" not in columns:
             self._conn.execute("ALTER TABLE sessions ADD COLUMN updated_at TEXT")
             # Для старых строк время последнего хода не сохранялось: берём разбор,
-            # а если его нет — момент начала, чтобы список не падал на NULL.
+            # а если его нет - момент начала, чтобы список не падал на NULL.
             self._conn.execute(
                 """UPDATE sessions
                    SET updated_at = COALESCE(
@@ -180,7 +180,7 @@ class Storage:
                 "UPDATE sessions SET scenario_id = ? WHERE scenario_id = ?",
                 (new_id, old_id),
             )
-        # «Проверка анкеты»: описания содержимого фото для героинь — колонка
+        # «Проверка анкеты»: описания содержимого фото для героинь - колонка
         # младше самой таблицы, у кого-то её ещё нет.
         pc_columns = {
             row["name"] for row in self._conn.execute("PRAGMA table_info(profile_checks)")
@@ -275,7 +275,7 @@ class Storage:
         return _row_to_session(row) if row is not None else None
 
     def last_session(self, user_id: int) -> StoredSession | None:
-        """Последняя сессия пользователя любого статуса — для антиповтора героини."""
+        """Последняя сессия пользователя любого статуса - для антиповтора героини."""
         with self._lock:
             row = self._conn.execute(
                 """SELECT * FROM sessions
@@ -286,7 +286,7 @@ class Storage:
         return _row_to_session(row) if row is not None else None
 
     def last_session_for(self, user_id: int, scenario_id: str) -> StoredSession | None:
-        """Последняя попытка пройти конкретный сценарий — для сценариев-продолжений."""
+        """Последняя попытка пройти конкретный сценарий - для сценариев-продолжений."""
         with self._lock:
             row = self._conn.execute(
                 """SELECT * FROM sessions
@@ -387,10 +387,10 @@ class Storage:
         return _row_to_profile_check(row) if row is not None else None
 
     def update_profile_check(self, check_id: int, **fields: Any) -> None:
-        """Точечное обновление; имена колонок — из белого списка ниже.
+        """Точечное обновление; имена колонок - из белого списка ниже.
 
         Списки и словари (photo_contents) сериализуются в JSON: в базе
-        строка, в памяти объекта — список.
+        строка, в памяти объекта - список.
         """
         allowed = {
             "phase", "name", "age", "bio", "text_iterations", "photo_reviews",

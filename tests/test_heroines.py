@@ -46,7 +46,7 @@ def test_eva_has_three_scenarios_in_story_order():
 def test_disabled_scenarios_are_out_of_rotation():
     assert "friday_evening/anya" not in available_scenarios()
     assert "reunion_call/ira" not in available_scenarios()
-    # Но файлы целы и грузятся по id — «на будущее».
+    # Но файлы целы и грузятся по id - «на будущее».
     assert load_scenario("friday_evening/anya").enabled is False
     assert "friday_evening/anya" in all_scenarios()
 
@@ -87,7 +87,7 @@ def test_persona_is_shared_between_vera_scenarios():
 
 
 def test_persona_is_shared_between_eva_scenarios():
-    """Ева в переписке, на созвоне и на свидании — один человек, не три похожие."""
+    """Ева в переписке, на созвоне и на свидании - один человек, не три похожие."""
     personas = {
         scenario_id: load_scenario(scenario_id).persona
         for scenario_id in ("first_message/eva", "first_call/eva", "first_date/eva")
@@ -118,7 +118,7 @@ def test_heroine_file_has_valid_personality():
     assert len(vera.speech) >= 80
     assert "«" in vera.speech
     assert vera.profile is not None
-    # Контракт анкеты — минимум 3 фото; у Веры 4 (город/парк, танцы, караоке, море).
+    # Контракт анкеты - минимум 3 фото; у Веры 4 (город/парк, танцы, караоке, море).
     assert len(vera.profile.photos) >= 3
     assert set(vera.profile.captions) == set(vera.profile.photos)
 

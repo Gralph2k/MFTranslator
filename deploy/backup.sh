@@ -12,7 +12,7 @@ KEEP_DAYS="${KEEP_DAYS:-14}"
 
 DB="$APP_DIR/data/bot.db"
 if [ ! -f "$DB" ]; then
-    echo "Базы пока нет: $DB — бэкапить нечего."
+    echo "Базы пока нет: $DB - бэкапить нечего."
     exit 0
 fi
 

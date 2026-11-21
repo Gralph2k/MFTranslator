@@ -82,7 +82,7 @@ class DeepSeekLLM:
                 message = choice.get("message") or {}
                 content = message.get("content")
                 if not content or not content.strip():
-                    # Пустой content в JSON-режиме — известная особенность DeepSeek.
+                    # Пустой content в JSON-режиме - известная особенность DeepSeek.
                     # Сначала пробуем без response_format (модель отвечает охотнее),
                     # потом добавляем прямое требование вернуть объект.
                     last_error = (

@@ -48,7 +48,7 @@ def test_in_person_scenario_shows_the_face():
 
 
 def test_player_writes_first(scenario):
-    """Пустой opening — старт с пустой стенограммы, бот не шлёт свою реплику."""
+    """Пустой opening - старт с пустой стенограммы, бот не шлёт свою реплику."""
     engine = DialogueEngine(FakeLLM([]))
     session = engine.start(scenario)
 
@@ -59,7 +59,7 @@ def test_player_writes_first(scenario):
 def test_rules_for_correspondence_are_text_only(scenario):
     rules = rules_text(scenario)
 
-    # Сначала рамка тренажёра, потом правила и команды — без подсказки на ход.
+    # Сначала рамка тренажёра, потом правила и команды - без подсказки на ход.
     assert "тренажёр, а не живая женщина" in rules
     assert "Команды" in rules
     assert "Подсказка" not in rules
@@ -101,13 +101,13 @@ def test_profile_card_text_uses_her_material(scenario):
 
 
 def test_card_uses_the_caption_of_each_photo(scenario):
-    """На карточке — подпись своего кадра, а не одна профессия на все."""
+    """На карточке - подпись своего кадра, а не одна профессия на все."""
     from bot.profile_card import card_caption
 
     assert "издательств" in card_caption(scenario, "profile_1.jpg")
     assert "Хобби" in card_caption(scenario, "profile_2.jpg")
     assert "Интересы" in card_caption(scenario, "profile_3.jpg")
-    # Нет подписи — остаётся профессия, а не пустое место.
+    # Нет подписи - остаётся профессия, а не пустое место.
     assert card_caption(scenario, "нет-такого.jpg") == scenario.persona.job
 
 
@@ -126,7 +126,7 @@ def test_persona_knows_her_life_and_likes(scenario):
 
 
 def test_profile_captions_split_the_story(scenario):
-    """Подписи к фото: работа, хобби, интересы — у каждого кадра своя."""
+    """Подписи к фото: работа, хобби, интересы - у каждого кадра своя."""
     captions = scenario.profile.captions
 
     assert set(captions) == set(scenario.profile.photos)
@@ -161,8 +161,8 @@ def test_persona_prompt_has_correspondence_and_red_lines(scenario):
 
     assert "переписываетесь" in prompt
     assert "Лица он не видит" in prompt
-    # В переписке смайлики — часть речи, но только на яркой эмоции.
-    assert "Смайлики — можно" in prompt
+    # В переписке смайлики - часть речи, но только на яркой эмоции.
+    assert "Смайлики - можно" in prompt
     assert "эмоция яркая" in prompt
     assert "смех, радость, смущение" in prompt
     assert "не в каждой реплике" in prompt
@@ -212,7 +212,7 @@ def test_state_guidance_at_low_openness_gives_content(scenario):
 def test_heroine_does_not_schedule_the_call_herself(scenario):
     """Шаг игрока (contact_hint) не должен становиться шагом героини в переписке.
 
-    Иначе при высокой открытости она сама назначает день и время созвона —
+    Иначе при высокой открытости она сама назначает день и время созвона -
     и пункт «дошёл до конкретики» перестаёт проверять навык игрока.
     """
     open_ = PersonaState(trust=0.8, openness=0.9, energy=0.7)
@@ -252,7 +252,7 @@ def test_drained_heroine_in_chat_does_not_offer_physical_contact(scenario):
 
 
 def test_red_flag_pressure_after_refusal_ends_the_chat(scenario):
-    """Игнорирование прямого «нет» — красная линия, а не очередная ловушка."""
+    """Игнорирование прямого «нет» - красная линия, а не очередная ловушка."""
     prompt = persona_system_prompt(
         scenario, PersonaState.from_mapping(scenario.initial_state)
     )
@@ -288,7 +288,7 @@ def test_new_hurts_cover_interrogation_and_short_answers(scenario):
 
 
 def test_sexual_red_flag_distinguishes_explicit_and_ambiguous(scenario):
-    """Явный намёк — сразу уход; двусмысленный — одна граница и только потом уход."""
+    """Явный намёк - сразу уход; двусмысленный - одна граница и только потом уход."""
     text = "\n".join(scenario.red_flags)
 
     assert "явный намёк" in text
@@ -318,7 +318,7 @@ def test_observer_does_not_score_his_answers(scenario):
 
 
 def test_first_template_is_a_soft_line(scenario):
-    """Первый шаблон — не красная линия: короткий ответ без счёта, повтор — уход."""
+    """Первый шаблон - не красная линия: короткий ответ без счёта, повтор - уход."""
     first = scenario.red_flags[0]
 
     assert "без счёта" in first
@@ -417,7 +417,7 @@ async def test_end_marker_closes_the_dialogue(scenario, caplog):
 
 
 async def test_engine_ends_on_farewell_phrase(scenario):
-    """«Пока»/«Удачи» без маркера всё равно закрывают разговор — это страховка."""
+    """«Пока»/«Удачи» без маркера всё равно закрывают разговор - это страховка."""
     llm = FakeLLM(
         [
             "Всё, пока.",
@@ -438,7 +438,7 @@ async def test_engine_ends_on_farewell_phrase(scenario):
 
 
 async def test_engine_does_not_end_on_planned_goodbye(scenario):
-    """«До завтра» — не конец: договорились продолжить."""
+    """«До завтра» - не конец: договорились продолжить."""
     llm = FakeLLM(
         [
             "До завтра.",

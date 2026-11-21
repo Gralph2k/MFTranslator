@@ -34,7 +34,7 @@ class VisionLLM:
     _client: httpx.AsyncClient | None = field(default=None, init=False, repr=False)
 
     def _extra_body(self) -> dict[str, Any]:
-        """Z.AI (glm-4.5+) — рейтинговые модели: без отключения размышлений
+        """Z.AI (glm-4.5+) - рейтинговые модели: без отключения размышлений
         токены уходят в reasoning_content и content приходит пустым."""
         if "z.ai" in self.base_url or "bigmodel" in self.base_url:
             return {"thinking": {"type": "disabled"}}

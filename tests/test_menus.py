@@ -20,7 +20,7 @@ def _texts(markup) -> list[str]:
 def test_heroines_menu_lists_only_active_heroines():
     markup = heroines_menu()
 
-    # «Проверка анкеты» — первая кнопка главного меню, ниже — героини.
+    # «Проверка анкеты» - первая кнопка главного меню, ниже - героини.
     assert _callbacks(markup) == [
         "profile:start",
         "menu:heroine:vera",
@@ -33,7 +33,7 @@ def test_heroines_menu_lists_only_active_heroines():
 
 
 def test_heroines_menu_without_check_for_bridge():
-    """Мостик после проверки анкеты — то же главное меню: анкета плюс героини."""
+    """Мостик после проверки анкеты - то же главное меню: анкета плюс героини."""
     assert _callbacks(heroines_menu()) == [
         "profile:start",
         "menu:heroine:vera",
@@ -90,7 +90,7 @@ def test_after_vera_call_leads_to_date():
 
 
 def test_after_date_shows_main_menu():
-    """«Первое свидание» — последняя сцена героини: дальше основное меню."""
+    """«Первое свидание» - последняя сцена героини: дальше основное меню."""
     main_menu = _callbacks(heroines_menu())
     assert _callbacks(after_finish_menu("first_date/vera")) == main_menu
     assert _callbacks(after_finish_menu("first_date/eva")) == main_menu

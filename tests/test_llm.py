@@ -21,7 +21,7 @@ def _message(content: str) -> dict:
 
 @pytest.fixture
 def no_sleep(monkeypatch):
-    """Бэкофф между ретраями не ждём — тесты и так детерминированы."""
+    """Бэкофф между ретраями не ждём - тесты и так детерминированы."""
 
     async def _instant(_seconds: float) -> None:
         return None

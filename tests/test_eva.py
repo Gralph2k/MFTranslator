@@ -86,7 +86,7 @@ def test_eva_traps_explain_why_they_seem_reasonable():
 
     assert len(hurts) >= 5
     for hurt in hurts:
-        assert "—" in hurt and len(hurt) > 60
+        assert "-" in hurt and len(hurt) > 60
     joined = " ".join(hurts).lower()
     assert "спонсор" in joined
     assert "статус" in joined or "цифрами" in joined

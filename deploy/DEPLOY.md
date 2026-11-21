@@ -2,16 +2,16 @@
 
 Сервер под этот бот: **Ubuntu 22.04, 1 vCPU, 2 GB RAM, 30 GB**, IP **176.124.220.117**,
 хостинг `nuxt.cloud` (Германия, AS216127). Для России это важно: Telegram там не
-блокируется, поэтому `TELEGRAM_PROXY` скорее всего не понадобится — проверит `bot.doctor`.
+блокируется, поэтому `TELEGRAM_PROXY` скорее всего не понадобится - проверит `bot.doctor`.
 
 Домен `vm1496646.cloud.nuxt.network` сейчас **не резолвится** (A-записи нет). Для long
 polling домен не нужен вообще: бот сам ходит в Telegram, входящие порты не открываются.
-Работаем по IP; если хочешь имя для SSH — добавь A-запись в DNS у провайдера.
+Работаем по IP; если хочешь имя для SSH - добавь A-запись в DNS у провайдера.
 
 ## 0. Как устроен бот на сервере
 
 - **long polling**, не webhook: ни nginx, ни сертификатов, ни домена не нужно;
-- **SQLite** в `data/bot.db` — единственные данные, которые надо беречь; `.tmp/` (карточки
+- **SQLite** в `data/bot.db` - единственные данные, которые надо беречь; `.tmp/` (карточки
   анкеты, экран звонка) перегенерируется;
 - **один процесс на токен**: второй экземпляр даст `Conflict: terminated by other
   getUpdates`, поэтому перезапуском занимается systemd, а не ручной запуск;
@@ -22,9 +22,9 @@ polling домен не нужен вообще: бот сам ходит в Tel
 Деплой идёт по SSH под `root`. Публичный ключ (`~/.ssh/id_ed25519.pub`) должен попасть
 в `~/.ssh/authorized_keys` на сервере. Два пути:
 
-1. **Панель провайдера** (nuxt.cloud): раздел SSH keys / cloud-init — вставить содержимое
+1. **Панель провайдера** (nuxt.cloud): раздел SSH keys / cloud-init - вставить содержимое
    `id_ed25519.pub` и применить к серверу. Удобнее всего, если доступ есть.
-2. **Если у root есть пароль** — одной командой из PowerShell (подставь свой ключ; кавычки
+2. **Если у root есть пароль** - одной командой из PowerShell (подставь свой ключ; кавычки
    обязательны, иначе ключ разобьётся на аргументы и запишется битым):
 
    ```powershell
@@ -34,15 +34,15 @@ polling домен не нужен вообще: бот сам ходит в Tel
    Пароль спросится один раз. Публичный ключ не секретен, но приватный
    (`id_ed25519`, без `.pub`) в репозиторий и в чат не попадает никогда.
 
-Проверка — без пароля:
+Проверка - без пароля:
 
 ```powershell
 ssh -o BatchMode=yes root@176.124.220.117 "echo OK; hostname"
 ```
 
-Если вывело `OK` — ключ работает, и `scp`/`tar` из раздела 1 пойдут без пароля.
+Если вывело `OK` - ключ работает, и `scp`/`tar` из раздела 1 пойдут без пароля.
 
-Удобный алиас: `C:\Users\<ты>\.ssh\config` (на Linux — `~/.ssh/config`):
+Удобный алиас: `C:\Users\<ты>\.ssh\config` (на Linux - `~/.ssh/config`):
 
 ```
 Host trainer
@@ -62,7 +62,7 @@ icacls "$env:USERPROFILE\.ssh\id_ed25519" /inheritance:r
 icacls "$env:USERPROFILE\.ssh\id_ed25519" /grant:r "$env:USERNAME:(R)"
 ```
 
-Харденинг — **только после того, как вход по ключу проверен** (иначе можно закрыть себе
+Харденинг - **только после того, как вход по ключу проверен** (иначе можно закрыть себе
 доступ; консоль провайдера держи под рукой). Создать `/etc/ssh/sshd_config.d/99-hardening.conf`:
 
 ```
@@ -76,7 +76,7 @@ sudo sshd -t && sudo systemctl reload ssh
 ```
 
 Плюс `ufw` (раздел 5) и при желании `fail2ban`. После этого пароль от root больше не
-работает — вход только по ключу, как и у сервиса `trainer` (у него пароля нет).
+работает - вход только по ключу, как и у сервиса `trainer` (у него пароля нет).
 
 ## 1. Перенести код с рабочей машины
 
@@ -96,14 +96,14 @@ tar -xzf /opt/mf-translator.tgz -C /opt/mf-translator
 rm /opt/mf-translator.tgz
 ```
 
-Переносить историю диалогов с рабочей машины не обязательно. Если нужна — снимай
+Переносить историю диалогов с рабочей машины не обязательно. Если нужна - снимай
 снимок, а не копируй живой файл: `sqlite3 data/bot.db ".backup data/bot-copy.db"`,
 затем `scp data\bot-copy.db root@176.124.220.117:/opt/mf-translator/data/bot.db`
 (папку `data` создать заранее).
 
-Альтернатива — git: закоммитить и запушить, на сервере `git clone`. Git у репозитория
+Альтернатива - git: закоммитить и запушить, на сервере `git clone`. Git у репозитория
 ходит по SSH, поэтому понадобится deploy key. Пушить можно только с явного разрешения
-владельца — надёжнее и быстрее перенос архивом.
+владельца - надёжнее и быстрее перенос архивом.
 
 ## 2. Установка
 
@@ -120,7 +120,7 @@ sudo bash /opt/mf-translator/deploy/setup.sh
 5) рендерит и включает `/etc/systemd/system/emotion-trainer.service`;
 6) гоняет `bot.doctor`.
 
-Первый запуск **остановится на шаге 6**, пока в `.env` пустые ключи — это ожидаемо.
+Первый запуск **остановится на шаге 6**, пока в `.env` пустые ключи - это ожидаемо.
 Заполни `.env` (шаг 3) и запусти скрипт ещё раз: он доставит всё и стартует сервис.
 
 ### Те же шаги вручную (если скрипт не хочешь)
@@ -142,7 +142,7 @@ sudo -u trainer -H cp /opt/mf-translator/.env.example /opt/mf-translator/.env
 sudo chmod 600 /opt/mf-translator/.env
 ```
 
-Без PPA (например, если Launchpad недоступен) — `uv`, как на рабочей машине:
+Без PPA (например, если Launchpad недоступен) - `uv`, как на рабочей машине:
 
 ```bash
 sudo apt install -y curl
@@ -160,14 +160,14 @@ sudo -u trainer nano /opt/mf-translator/.env
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | токен от @BotFather (`/newbot`) |
 | `DEEPSEEK_API_KEY` | ключ с platform.deepseek.com |
-| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` — можно не менять |
-| `DEEPSEEK_MODEL` | `deepseek-chat` — можно не менять |
+| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` - можно не менять |
+| `DEEPSEEK_MODEL` | `deepseek-chat` - можно не менять |
 | `TELEGRAM_PROXY` | оставить пустым: VPS в Германии, Telegram открыт |
-| `DB_PATH` | `./data/bot.db` — можно не менять |
+| `DB_PATH` | `./data/bot.db` - можно не менять |
 | `SAFETY_RESOURCES` | **вписать реальные контакты помощи** до публичного запуска: код их не выдумывает |
-| `VISION_API_KEY` | ключ OpenRouter для оценки фото анкеты; как завести — `deploy/OPENROUTER.md`. Пусто = фаза фото отключена |
-| `VISION_BASE_URL` / `VISION_MODEL` | дефолты (`https://openrouter.ai/api/v1`, `google/gemini-2.5-flash-lite`) — можно не менять |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | почта для отладочного дублика фото. **На текущем VPS не работает: хостер блокирует исходящие SMTP-порты (465/587)** — оставить пустыми |
+| `VISION_API_KEY` | ключ OpenRouter для оценки фото анкеты; как завести - `deploy/OPENROUTER.md`. Пусто = фаза фото отключена |
+| `VISION_BASE_URL` / `VISION_MODEL` | дефолты (`https://openrouter.ai/api/v1`, `google/gemini-2.5-flash-lite`) - можно не менять |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | почта для отладочного дублика фото. **На текущем VPS не работает: хостер блокирует исходящие SMTP-порты (465/587)** - оставить пустыми |
 | `PROFILE_DEBUG_CHAT_ID` | telegram_id владельца: дублик «Проверки анкеты» (фото + переписка) приходит ему в Telegram. **На время тестирования**; пусто = дублик выключен |
 | `PROFILE_DEBUG_EMAIL` | адрес почтового дублика (запасной канал); пусто = выключен |
 
@@ -179,13 +179,13 @@ sudo -u trainer nano /opt/mf-translator/.env
 sudo -u trainer /opt/mf-translator/.venv/bin/python -m bot.doctor
 ```
 
-Должно быть два `OK`. Если Telegram — «нет соединения», это значит, что хостинг всё-таки
+Должно быть два `OK`. Если Telegram - «нет соединения», это значит, что хостинг всё-таки
 фильтрует: тогда `TELEGRAM_PROXY` (socks5/http на зарубежный прокси) или другой VPS.
 
 ## 4. systemd
 
 Юнит уже установлен скриптом: `/etc/systemd/system/emotion-trainer.service`.
-Если ставил вручную — отрендери шаблон:
+Если ставил вручную - отрендери шаблон:
 
 ```bash
 sudo sed "s|__APP_DIR__|/opt/mf-translator|g; s|__SERVICE_USER__|trainer|g" \
@@ -209,7 +209,7 @@ sudo journalctl -u emotion-trainer -n 100    # последние 100 строк
 
 ## 5. Файрвол
 
-Входящие порты боту не нужны — только SSH. Если включаешь ufw, сначала разреши SSH
+Входящие порты боту не нужны - только SSH. Если включаешь ufw, сначала разреши SSH
 (и свой порт, если он нестандартный), потом включай:
 
 ```bash
@@ -227,14 +227,14 @@ sudo journalctl -u emotion-trainer -n 50 --no-pager
 ```
 
 В Telegram: `/start` → должен прийти первый сценарий (переписка), `/scenario first_call/vera`
-→ экран звонка и «Алло. О. Ты правда позвонил.». Если это работает — деплой готов.
+→ экран звонка и «Алло. О. Ты правда позвонил.». Если это работает - деплой готов.
 
 ## 7. Обновления
 
 **Правило: любое изменение кода или сценариев деплоится и перезапускает бота.**
 Локальный прогон ничего не доказывает: пользователи ходят через VPS.
 
-Порядок — тесты, бэкап, архив, распаковка, зависимости, перезапуск, проверка:
+Порядок - тесты, бэкап, архив, распаковка, зависимости, перезапуск, проверка:
 
 ```powershell
 # 0. локально: тесты и demo-прогон изменённого сценария
@@ -254,7 +254,7 @@ scp .tmp\update.tgz root@176.124.220.117:/opt/update.tgz
 cd /opt
 tar -xzf update.tgz -C /opt/mf-translator && rm update.tgz
 chown -R trainer:trainer /opt/mf-translator
-# Права: архив из Windows приносит файлы с 666 — без этого код writable для всех.
+# Права: архив из Windows приносит файлы с 666 - без этого код writable для всех.
 chmod -R u=rwX,go=rX /opt/mf-translator/bot /opt/mf-translator/deploy \
   /opt/mf-translator/scenarios /opt/mf-translator/tests /opt/mf-translator/prompts
 find /opt/mf-translator -maxdepth 1 -type f -exec chmod 644 {} +
@@ -275,8 +275,8 @@ journalctl -u emotion-trainer -n 20 --no-pager | grep -E "Бот запущен|
 bash /opt/mf-translator/deploy/setup.sh
 ```
 
-Успех — `active` и в логе `Бот запущен` + `Run polling`, без `Traceback` и `Conflict`.
-Если сервис падает — `journalctl -u emotion-trainer -n 100`: чаще всего забытая
+Успех - `active` и в логе `Бот запущен` + `Run polling`, без `Traceback` и `Conflict`.
+Если сервис падает - `journalctl -u emotion-trainer -n 100`: чаще всего забытая
 зависимость в `pyproject.toml` (так было с `Pillow`) или ошибка загрузки сценария.
 
 Git-вариант (если на сервере клон): `git pull` под `trainer`, затем
@@ -317,11 +317,11 @@ sudo systemctl start emotion-trainer
 |---|---|
 | `Conflict: terminated by other getUpdates` | запущен второй экземпляр с тем же токеном: `sudo pgrep -af bot.telegram_bot`, лишний убить, `sudo systemctl restart emotion-trainer`; на рабочей машине бот с тем же токеном должен быть выключен |
 | `doctor`: «нет соединения с api.telegram.org» | сеть VPS не видит Telegram: `TELEGRAM_PROXY` или другой хостинг |
-| `doctor`: 401 | токен перевыпущен/с опечаткой — обновить `.env` |
-| `doctor`: 402 | кончился баланс DeepSeek — пополнить |
+| `doctor`: 401 | токен перевыпущен/с опечаткой - обновить `.env` |
+| `doctor`: 402 | кончился баланс DeepSeek - пополнить |
 | `Permission denied` на `data/` | сервис запущен не под `trainer`: `sudo chown -R trainer:trainer /opt/mf-translator/data` |
-| Бот пишет «Не получилось ответить» | `sudo journalctl -u emotion-trainer -n 100` — сеть до DeepSeek или формат ответа модели |
-| ssh: `Permission denied, please try again` на пароле | Пароль из панели не применён или скопирован с лишним символом. Проверь вход **консолью провайдера**; если и там не пускает — Reset root password, перезагрузка сервера; если пускает — ставь ключ из консоли (раздел 0.5). `PermitRootLogin prohibit-password` тут ни при чём: `ssh -v` показывает, что сервер предлагает `publickey,password` |
+| Бот пишет «Не получилось ответить» | `sudo journalctl -u emotion-trainer -n 100` - сеть до DeepSeek или формат ответа модели |
+| ssh: `Permission denied, please try again` на пароле | Пароль из панели не применён или скопирован с лишним символом. Проверь вход **консолью провайдера**; если и там не пускает - Reset root password, перезагрузка сервера; если пускает - ставь ключ из консоли (раздел 0.5). `PermitRootLogin prohibit-password` тут ни при чём: `ssh -v` показывает, что сервер предлагает `publickey,password` |
 | «Бот не отвечает» после обновления `.env` | забыл `sudo systemctl restart emotion-trainer` |
 
 ## 10. Мелочи

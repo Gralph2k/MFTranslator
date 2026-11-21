@@ -1,7 +1,7 @@
-"""Экран исходящего звонка как в Android: фото сценария, интерфейс — кодом.
+"""Экран исходящего звонка как в Android: фото сценария, интерфейс - кодом.
 
 Буквы на сгенерированных картинках превращаются в кашу, поэтому лицо берётся
-готовым, а «ВЫЗОВ», имя, тип звонка и красную трубку рисуем здесь — тем же
+готовым, а «ВЫЗОВ», имя, тип звонка и красную трубку рисуем здесь - тем же
 подходом, что и карточку анкеты в `profile_card.py`: шрифты с фолбэками,
 кеш в `.tmp`, LANCZOS и плавное затемнение краёв.
 """
@@ -21,7 +21,7 @@ CALL_DIR = ROOT / ".tmp" / "call_screens"
 CALL_PHOTO = "call.jpg"
 SIZE = 1024
 
-# Затемнение сверху — под подпись звонка, снизу — под имя, статус и кнопку.
+# Затемнение сверху - под подпись звонка, снизу - под имя, статус и кнопку.
 _TOP_SHADE = 280
 _BOTTOM_SHADE = 560
 
@@ -53,7 +53,7 @@ def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.I
 
 
 def render_call_screen(scenario: Scenario) -> Path | None:
-    """Собирает экран звонка из `images/call.jpg`. Нет фото — нет экрана."""
+    """Собирает экран звонка из `images/call.jpg`. Нет фото - нет экрана."""
     source = scenario.faces_dir / CALL_PHOTO
     if not source.is_file():
         return None
@@ -150,7 +150,7 @@ def _darken_edges(canvas: Image.Image) -> None:
     shade = ImageDraw.Draw(overlay)
 
     # Лёгкая общая вуаль входит в альфу градиента: фото остаётся собой,
-    # но белый текст не слепит на нём. Отдельным слоем её класть нельзя —
+    # но белый текст не слепит на нём. Отдельным слоем её класть нельзя -
     # построчные прямоугольники затрут её и на границе появится шов.
     veil = 40
 
@@ -165,7 +165,7 @@ def _darken_edges(canvas: Image.Image) -> None:
         alpha = min(255, veil + int(215 * (ratio ** 1.35)))
         shade.rectangle([0, y, SIZE, y + 1], fill=(8, 8, 12, alpha))
 
-    # Середина — ровная вуаль, без градиента.
+    # Середина - ровная вуаль, без градиента.
     shade.rectangle([0, _TOP_SHADE, SIZE, bottom_top], fill=(8, 8, 12, veil))
 
     canvas.paste(Image.alpha_composite(canvas.convert("RGBA"), overlay).convert("RGB"))
@@ -190,7 +190,7 @@ def _spaced_text(
 
 
 def _hang_up_button(canvas: Image.Image) -> None:
-    """Красный круг с белой трубкой: единственная кнопка — сбросить звонок."""
+    """Красный круг с белой трубкой: единственная кнопка - сбросить звонок."""
     cx, cy = _BUTTON_CENTER
     radius = _BUTTON_RADIUS
 
@@ -212,7 +212,7 @@ def _hang_up_button(canvas: Image.Image) -> None:
 def _handset(size: int) -> Image.Image:
     """Трубка: дуга с утолщёнными концами, повёрнутая как на кнопке сброса.
 
-    Рисуем с четырёхкратным запасом и уменьшаем LANCZOS — иначе диагональ
+    Рисуем с четырёхкратным запасом и уменьшаем LANCZOS - иначе диагональ
     получается рваной на маленькой иконке.
     """
     scale = 4

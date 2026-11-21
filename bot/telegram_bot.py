@@ -71,9 +71,9 @@ PREVIOUS_MESSAGES = 12
 class ProfileFlow:
     """Активный прогон «Проверки анкеты» в памяти.
 
-    Текст и счётчики живут в базе и переживают рестарт; здесь — только то, что
+    Текст и счётчики живут в базе и переживают рестарт; здесь - только то, что
     в базе не хранится: file_id присланных фото (Telegram держит их у себя,
-    мы — принципиально нет) и структурные разборы для финального резюме.
+    мы - принципиально нет) и структурные разборы для финального резюме.
     """
 
     check: StoredProfileCheck
@@ -100,7 +100,7 @@ class Trainer:
         self.storage = storage
         self.default_scenario = default_scenario
         self.safety_resources = safety_resources
-        # Фото — часть сценария; флаг нужен тестам, чтобы не звать Telegram.
+        # Фото - часть сценария; флаг нужен тестам, чтобы не звать Telegram.
         self.with_faces = with_faces
         self.sessions: dict[int, DialogueSession] = {}
         self.profile_flows: dict[int, ProfileFlow] = {}
@@ -108,14 +108,14 @@ class Trainer:
         # Telegram хранит загруженный файл у себя: второй раз шлём по file_id,
         # иначе каждый ход тратит время на загрузку полумегабайтной картинки.
         self.face_file_ids: dict[str, str] = {}
-        # Vision для оценки фото анкеты; None — ключ не настроен, фаза фото
+        # Vision для оценки фото анкеты; None - ключ не настроен, фаза фото
         # вежливо откажет вместо падения.
         self.vision = vision
         # Для отладочного почтового дублика (включается PROFILE_DEBUG_EMAIL).
         self.settings = settings
         # Замок на пользователя: aiogram обрабатывает апдейты конкурентно
         # (start_polling с handle_as_tasks=True), а ходы одного диалога должны
-        # идти по порядку — иначе реплики перемешаются, а разбор задвоится.
+        # идти по порядку - иначе реплики перемешаются, а разбор задвоится.
         self._user_locks: dict[int, asyncio.Lock] = {}
 
     def user_lock(self, telegram_id: int) -> asyncio.Lock:
@@ -152,13 +152,13 @@ class Trainer:
             previous=self._previous_chat(user_id, scenario),
         )
         # Бонус за заполненную анкету считаем заново: поле не в базе, а факт
-        # «анкета заполнена» — в базе. Иначе после рестарта лимит скакнул бы назад.
+        # «анкета заполнена» - в базе. Иначе после рестарта лимит скакнул бы назад.
         self._apply_profile(user_id, session)
         self.sessions[telegram_id] = session
         return session
 
     def last_heroine(self, telegram_id: int) -> str | None:
-        """Героиня последней сессии — чтобы `/start` не выдавал её же подряд."""
+        """Героиня последней сессии - чтобы `/start` не выдавал её же подряд."""
         user_id = self.storage.ensure_user(telegram_id)
         stored = self.storage.last_session(user_id)
         if stored is None:
@@ -268,7 +268,7 @@ class Trainer:
             setattr(flow.check, key, value)
 
     def close_profile_flow(self, telegram_id: int, completed: bool = False) -> None:
-        """Закрывает флоу — завершением, отменой или уходом в сценарий."""
+        """Закрывает флоу - завершением, отменой или уходом в сценарий."""
         flow = self.profile_flows.pop(telegram_id, None)
         check = flow.check if flow is not None else None
         if check is None:
@@ -300,7 +300,7 @@ def _trainer(message: Message) -> Trainer:
 async def _send_long(
     message: Message, text: str, reply_markup: InlineKeyboardMarkup | None = None
 ) -> None:
-    """Telegram режет сообщения на 4096 символах — делим по строкам.
+    """Telegram режет сообщения на 4096 символах - делим по строкам.
 
     Клавиатура цепляется к последнему куску.
     """
@@ -316,7 +316,7 @@ async def _send_long(
 
 
 async def _send_face(message: Message, trainer: "Trainer", session: Any, caption: str) -> bool:
-    """Лицо под текущее настроение. False — если картинки нет, текст отправит вызывающий.
+    """Лицо под текущее настроение. False - если картинки нет, текст отправит вызывающий.
 
     В переписке и на созвоне лицо не показываем: там эмоция читается только
     по тексту и смайликам, иначе рушится сама сцена.
@@ -346,7 +346,7 @@ async def _send_call_screen(target: Message, scenario: Scenario) -> None:
     """Экран исходящего звонка: единственная картинка сцены-созвона.
 
     Рисуется кодом поверх фото (имя, «мобильный», «Вызов…», кнопка сброса):
-    текст на сгенерированных картинках превращается в кашу, поэтому UI — PIL.
+    текст на сгенерированных картинках превращается в кашу, поэтому UI - PIL.
     """
     from .call_screen import render_call_screen
 
@@ -365,7 +365,7 @@ async def _send_profile(
 
     Подписи у фото разные: работа и «о себе», интересы, чего ищет. Так текст
     не повторяется отдельным блоком «О себе». Фото анкеты лежат в папке
-    сценария с именами `profile_*` — `faces.py` их не трогает.
+    сценария с именами `profile_*` - `faces.py` их не трогает.
     """
     profile = scenario.profile
     if profile is None:
@@ -385,7 +385,7 @@ async def _send_profile(
         return captions.get(photos[index][1]) or None
 
     if len(cards) == 1:
-        # Одно фото — не альбом: answer_media_group требует хотя бы два кадра.
+        # Одно фото - не альбом: answer_media_group требует хотя бы два кадра.
         await target.answer_photo(
             FSInputFile(cards[0]), caption=photo_caption(0)
         )
@@ -405,7 +405,7 @@ async def _send_profile(
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     trainer = _trainer(message)
-    # /start — лендинг бота: что здесь можно и зачем. Сценарий игрок выбирает сам.
+    # /start - лендинг бота: что здесь можно и зачем. Сценарий игрок выбирает сам.
     async with trainer.user_lock(message.from_user.id):
         trainer.close_profile_flow(message.from_user.id)
     await _send_long(message, start_intro(), reply_markup=heroines_menu())
@@ -425,15 +425,15 @@ async def _begin(
         try:
             session = trainer.start_session(telegram_id, scenario_id)
         except ScenarioError:
-            await target.answer("Такого сценария нет. /menu — список.")
+            await target.answer("Такого сценария нет. /menu - список.")
             return
 
         trainer.persist(telegram_id, session)
-        # 1. «Это тренажёр», как играть и команды — без подсказки на первый ход.
+        # 1. «Это тренажёр», как играть и команды - без подсказки на первый ход.
         await _send_long(target, rules_text(session.scenario))
 
         if session.scenario.is_correspondence:
-            # 2. Описание сценария, 3. её анкета — подписи с «о себе» разнесены по фото.
+            # 2. Описание сценария, 3. её анкета - подписи с «о себе» разнесены по фото.
             await _send_long(target, backstory_text(session.scenario))
             # 3. Анкета с картинками и подписями. «Ход твой» уже сказано в описании,
             #    поэтому отдельного сообщения с подсказкой нет.
@@ -470,10 +470,10 @@ async def cmd_scenario(message: Message) -> None:
     try:
         scenario = trainer.scenario_by_id(scenario_id)
     except ScenarioError:
-        await message.answer("Такого сценария нет. /menu — список героинь.")
+        await message.answer("Такого сценария нет. /menu - список героинь.")
         return
     if not scenario.enabled:
-        await message.answer("Этот сценарий выключен. /menu — выбрать героиню.")
+        await message.answer("Этот сценарий выключен. /menu - выбрать героиню.")
         return
     await _begin(message, trainer, message.from_user.id, scenario_id)
 
@@ -482,7 +482,7 @@ async def cmd_scenario(message: Message) -> None:
 async def cmd_restart(message: Message) -> None:
     trainer = _trainer(message)
     current = trainer.get_session(message.from_user.id)
-    # Активную сцену повторяем; выключенную или отсутствующую — меняем на случайную
+    # Активную сцену повторяем; выключенную или отсутствующую - меняем на случайную
     # героиню, чтобы /restart не запускал сценарий «на будущее».
     if current is not None and current.scenario.enabled:
         scenario_id = current.scenario.id
@@ -501,7 +501,7 @@ async def cmd_finish(message: Message) -> None:
             await message.answer("Разбирать пока нечего: сначала поговори с ней. /start")
             return
         if session.debrief_sent:
-            await message.answer("Разбор уже был выше. Новый разговор — /restart.")
+            await message.answer("Разбор уже был выше. Новый разговор - /restart.")
             return
 
         await _deliver_debrief(message, trainer, message.from_user.id, session)
@@ -620,7 +620,7 @@ def _privacy_warning(trainer: "Trainer") -> str:
     """Предупреждение перед фото: внешний сервис анализа и что мы ничего не храним.
 
     Отладочный дублик разработчику в тексте не упоминаем (решение владельца:
-    не пугать пользователей) — он уходит тихо, сам текст предупреждения не меняет.
+    не пугать пользователей) - он уходит тихо, сам текст предупреждения не меняет.
     """
     return load_config()["privacy_warning"].format(provider=_vision_provider_label(trainer))
 
@@ -781,14 +781,14 @@ def _schedule_debug_dump(
     if settings is None:
         return
     check = flow.check
-    caption = f"Анкета: {check.name or '—'} ({check.age or '?'}) — tg {telegram_id}"
+    caption = f"Анкета: {check.name or '-'} ({check.age or '?'}) - tg {telegram_id}"
     body = (
         f"telegram_id: {telegram_id}\n"
         f"Имя: {check.name}\nВозраст: {check.age}\n"
         f"Разборов текста: {check.text_iterations}, оценок фото: {check.photo_reviews}\n\n"
-        f"Текст анкеты:\n{check.bio or '—'}\n\n"
-        f"Последний разбор текста:\n{check.last_text_verdict or '—'}\n\n"
-        f"Последний разбор фото:\n{check.last_photo_verdict or '—'}"
+        f"Текст анкеты:\n{check.bio or '-'}\n\n"
+        f"Последний разбор текста:\n{check.last_text_verdict or '-'}\n\n"
+        f"Последний разбор фото:\n{check.last_photo_verdict or '-'}"
     )
     if settings.debug_chat_enabled and settings.profile_debug_chat_id is not None:
         async def _to_chat() -> None:
@@ -813,7 +813,7 @@ def _schedule_debug_dump(
 def _notify_owner(bot: Bot, trainer: "Trainer", text: str) -> None:
     """Отчёт владельцу о завершённом сценарии: переписка и разбор.
 
-    Каналы независимы: Telegram (пока SMTP на VPS закрыт хостером — основной)
+    Каналы независимы: Telegram (пока SMTP на VPS закрыт хостером - основной)
     и почта, если SMTP_* и PROFILE_DEBUG_EMAIL настроены и доступны.
     """
     settings = trainer.settings
@@ -931,7 +931,7 @@ async def _handle_photo_batch(
         flow.photo_ids.extend(taken)
         count = len(flow.photo_ids)
 
-        # Альбом — полный комплект, 4-е одиночное фото — потолок: оцениваем сразу.
+        # Альбом - полный комплект, 4-е одиночное фото - потолок: оцениваем сразу.
         if len(messages) > 1 or count >= max_photos:
             await _evaluate_photos(trigger, trainer, telegram_id, flow)
             return
@@ -987,13 +987,13 @@ async def on_photo(message: Message) -> None:
     trainer = _trainer(message)
     if message.photo is None:
         return
-    # Фото вне «Проверки анкеты» бот игнорирует — как и до неё.
+    # Фото вне «Проверки анкеты» бот игнорирует - как и до неё.
     flow = trainer.get_profile_flow(message.from_user.id)
     if flow is None:
         return
     if flow.check.phase != "photos":
         # На фазах имени и текста фото молча ждёт своего этапа; в «menu»
-        # подсказываем кнопки — разбор уже есть, кнопки под ним.
+        # подсказываем кнопки - разбор уже есть, кнопки под ним.
         if flow.check.phase == "menu":
             await message.answer(t("flow_active_hint"))
         return
@@ -1071,7 +1071,7 @@ async def on_text(message: Message) -> None:
             return
         if session.is_over:
             await message.answer(
-                "Этот разговор закончен. Новый — /restart или /menu."
+                "Этот разговор закончен. Новый - /restart или /menu."
             )
             return
 
@@ -1093,7 +1093,7 @@ async def on_text(message: Message) -> None:
         # Имя перед репликой не пишем: в переписке сообщение и так от неё.
         reply_text = reply
         if len(reply_text) > 1024:
-            # Не влезает в подпись к фото — шлём картинку и текст отдельно.
+            # Не влезает в подпись к фото - шлём картинку и текст отдельно.
             await _send_face(message, trainer, session, "")
             await _send_long(message, reply_text)
         elif not await _send_face(message, trainer, session, reply_text):
@@ -1102,15 +1102,15 @@ async def on_text(message: Message) -> None:
         if session.ended_by_persona:
             # Красная линия: она закончила разговор. Разбор объяснит, на каком ходу.
             if session.scenario.is_call:
-                farewell = "Она положила трубку. Сейчас будет разбор — почему."
+                farewell = "Она положила трубку. Сейчас будет разбор - почему."
             elif session.scenario.is_correspondence:
-                farewell = "Она закрыла переписку. Сейчас будет разбор — почему."
+                farewell = "Она закрыла переписку. Сейчас будет разбор - почему."
             else:
-                farewell = "Она ушла от разговора. Сейчас будет разбор — почему."
+                farewell = "Она ушла от разговора. Сейчас будет разбор - почему."
             await message.answer(farewell)
 
         if session.is_over:
-            # Сюжет закончился (кончились ходы или персонаж закрыл тему) — разбираем сразу.
+            # Сюжет закончился (кончились ходы или персонаж закрыл тему) - разбираем сразу.
             await _deliver_debrief(message, trainer, message.from_user.id, session)
 
 
@@ -1219,7 +1219,7 @@ async def _run(settings: Settings, scenario: Scenario) -> None:
     )
     global _trainer_instance
     _trainer_instance = trainer
-    # PID-файл — чтобы следующий run-bot мог закрыть именно этот процесс.
+    # PID-файл - чтобы следующий run-bot мог закрыть именно этот процесс.
     try:
         write_pid()
     except OSError as exc:

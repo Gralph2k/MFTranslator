@@ -54,11 +54,11 @@ class DialogueSession:
     session_id: int | None = None
     # Переписка из сценария-продолжения: персонаж её помнит, и она попадает в промпт.
     previous: list[dict[str, str]] = field(default_factory=list)
-    # Дополнительные ходы за заполненную анкету: поле сессии, а не сценария —
+    # Дополнительные ходы за заполненную анкету: поле сессии, а не сценария -
     # Scenario шарится между пользователями, мутация меняла бы лимит всем.
     bonus_turns: int = 0
     # Выжимка анкеты игрока (он прошёл «Проверку анкеты»): героиня ссылается на неё
-    # в разговоре. None — анкеты нет.
+    # в разговоре. None - анкеты нет.
     player_profile: str | None = None
 
     @property
@@ -89,7 +89,7 @@ class Debrief:
     def render(self, scenario: Scenario) -> str:
         lines = [f"Разбор: «{scenario.title}»", f"Итог: {self.total} из {self.max_total}", ""]
         for item in scenario.rubric:
-            lines.append(f"{item.label} — {self.scores.get(item.id, 0)}/{item.max}")
+            lines.append(f"{item.label} - {self.scores.get(item.id, 0)}/{item.max}")
         if self.summary:
             lines.extend(["", self.summary])
         if self.strengths:
@@ -102,7 +102,7 @@ class Debrief:
             quote = moment.get("quote", "").strip()
             why = moment.get("why", "").strip()
             if quote:
-                lines.extend(["", f"«{quote}» — {why}"])
+                lines.extend(["", f"«{quote}» - {why}"])
         original = self.rewrite.get("original", "").strip()
         better = self.rewrite.get("better", "").strip()
         if original and better:
@@ -126,7 +126,7 @@ class DialogueEngine:
             state=PersonaState.from_mapping(scenario.initial_state),
             previous=list(previous or []),
         )
-        # В переписке первое сообщение пишет игрок: пустой opening — это команда
+        # В переписке первое сообщение пишет игрок: пустой opening - это команда
         # движку начать с пустой стенограммы, а не отправить пустую реплику бота.
         if scenario.opening.strip():
             session.history.append({"role": "assistant", "content": scenario.opening})
@@ -143,7 +143,7 @@ class DialogueEngine:
 
         if detect_crisis(text):
             # Упражнение останавливается: продолжать сцену в такой момент нельзя.
-            # Сообщение при этом остаётся в стенограмме — это часть записи разговора.
+            # Сообщение при этом остаётся в стенограмме - это часть записи разговора.
             raise CrisisDetected(text)
 
         try:
@@ -160,13 +160,13 @@ class DialogueEngine:
                 temperature=0.85,
             )
         except Exception:
-            # Реплика не состоялась: ход не списан, сообщение убрано — повторная
+            # Реплика не состоялась: ход не списан, сообщение убрано - повторная
             # отправка не создаст дубль в стенограмме и не съест лимит ходов.
             session.history.pop()
             session.user_turns -= 1
             raise
         reply, embedded_state, ended = _parse_persona_reply(raw)
-        # Явный маркер прощания надёжнее наблюдателя: героиня сказала «пока» — сессия
+        # Явный маркер прощания надёжнее наблюдателя: героиня сказала «пока» - сессия
         # закрывается сразу, и следующая реплика игрока уже не обрабатывается.
         marker_ended = END_MARKER in raw
         if marker_ended:
@@ -235,7 +235,7 @@ def _parse_persona_reply(raw: str) -> tuple[str, dict[str, Any] | None, bool]:
     """Разбирает ответ модели.
 
     Обычно это просто текст реплики. Но если модель всё-таки вернула JSON
-    с полем reply — используем его, чтобы не терять состояние из лишнего запроса.
+    с полем reply - используем его, чтобы не терять состояние из лишнего запроса.
     None во втором элементе значит «состояния в ответе нет».
     """
     try:

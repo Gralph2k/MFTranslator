@@ -7,7 +7,7 @@ import pytest
 
 from bot import launcher
 
-# %TEMP% закрыт песочницей, поэтому временные файлы — внутри проекта.
+# %TEMP% закрыт песочницей, поэтому временные файлы - внутри проекта.
 TMP_ROOT = Path(__file__).resolve().parent.parent / ".tmp"
 
 
