@@ -41,7 +41,9 @@ from .profile_check import (
     TextReview,
     compress_photo,
     consultant_messages,
+    INTRO_MAX_WORDS,
     load_config,
+    looks_like_bio,
     parse_name_age,
     parse_photo_review,
     parse_text_review,
@@ -50,6 +52,7 @@ from .profile_check import (
     player_profile_block,
     render_photo_review,
     render_text_review,
+    split_intro_bio,
     t,
 )
 from .prompts import backstory_text, format_transcript, profile_text, rules_text, start_intro
@@ -1039,7 +1042,26 @@ async def on_profile_text(message: Message) -> None:
 
         phase = flow.check.phase
         if phase == "name":
-            parsed = parse_name_age(text, *load_config()["age_range"])
+            age_min, age_max = load_config()["age_range"]
+            # Имя, возраст и анкета одним сообщением: берём начало и сразу
+            # запускаем разбор, анкету не переспрашиваем.
+            if looks_like_bio(text):
+                intro, bio = split_intro_bio(text, age_min, age_max)
+                parsed = (
+                    parse_name_age(intro, age_min, age_max)
+                    if bio and len(intro.split()) <= INTRO_MAX_WORDS
+                    else None
+                )
+                if parsed is not None:
+                    name, age = parsed
+                    trainer.save_flow(flow, name=name, age=age, bio=bio)
+                    await _review_text(message, trainer, message.from_user.id, flow, bio)
+                    return
+                # Анкета вместо имени: текст сохраняем, имя и возраст просим следом.
+                trainer.save_flow(flow, bio=text)
+                await message.answer(t("bio_saved_ask_name"))
+                return
+            parsed = parse_name_age(text, age_min, age_max)
             if parsed is None:
                 flow.name_retries += 1
                 if flow.name_retries >= 3:
@@ -1049,6 +1071,13 @@ async def on_profile_text(message: Message) -> None:
                 await message.answer(t("name_retry"))
                 return
             name, age = parsed
+            pending_bio = flow.check.bio
+            if pending_bio:
+                # Анкета уже лежит с прошлого шага - имя и возраст долетели,
+                # запускаем разбор без лишних вопросов.
+                trainer.save_flow(flow, name=name, age=age)
+                await _review_text(message, trainer, message.from_user.id, flow, pending_bio)
+                return
             trainer.save_flow(flow, name=name, age=age, phase="bio")
             await message.answer(t("ask_bio"))
             return

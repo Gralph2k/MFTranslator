@@ -72,6 +72,42 @@ def parse_name_age(text: str, age_min: int = 18, age_max: int = 99) -> tuple[str
     return name[0].upper() + name[1:], ages[0]
 
 
+# Анкета «похожа на анкету» от 15 слов: строка «Саша, 32» и вежливое «привет,
+# проверь меня» до этого порога не дотягивают.
+BIO_MIN_WORDS = 15
+# Начало сообщения с именем и возрастом не длиннее: больше слов - это уже проза
+# анкеты, и «имя» из неё parse_name_age вытащит по ошибке.
+INTRO_MAX_WORDS = 10
+
+
+def looks_like_bio(text: str) -> bool:
+    """Длинное сообщение похоже на анкету, а не на строку «Саша, 32»."""
+    return len(text.split()) >= BIO_MIN_WORDS
+
+
+def split_intro_bio(text: str, age_min: int, age_max: int) -> tuple[str, str]:
+    """Отделяет начало с именем и возрастом от самой анкеты.
+
+    «Саша, 32\n<анкета>» - режем по первой строке; одна строка - по границе
+    первого предложения («Меня зовут Саша, мне 32 года. <анкета>»), если оно
+    короткое, парсится и после него остаётся анкета. Иначе всё сообщение
+    считается анкетой без начала.
+    """
+    intro, sep, bio = text.partition("\n")
+    if sep:
+        return intro.strip(), bio.strip()
+    match = re.search(r"(?<=[.!?])\s+", text)
+    if match:
+        head, tail = text[: match.end()].strip(), text[match.end():].strip()
+        if (
+            len(head.split()) <= INTRO_MAX_WORDS
+            and parse_name_age(head, age_min, age_max) is not None
+            and looks_like_bio(tail)
+        ):
+            return head, tail
+    return text, ""
+
+
 @dataclass
 class Flag:
     type: str  # "red" | "green"

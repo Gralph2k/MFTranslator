@@ -14,12 +14,14 @@ from bot.profile_check import (
     PROFILE_BONUS_TURNS,
     consultant_messages,
     load_config,
+    looks_like_bio,
     parse_name_age,
     parse_photo_review,
     parse_text_review,
     player_profile_block,
     render_photo_review,
     render_text_review,
+    split_intro_bio,
 )
 from bot.prompts import persona_messages, rules_text
 from bot.scenario import load_scenario
@@ -346,6 +348,76 @@ async def test_flow_name_retries_give_up(store, monkeypatch):
     await telegram_bot.on_profile_text(third)
     assert trainer.get_profile_flow(1) is None  # флоу закрыт
     assert any("проверку заново" in text.lower() for text in third.sent)
+
+
+async def test_flow_name_age_bio_in_one_message(store, monkeypatch):
+    """Имя, возраст и анкета одним сообщением - разбор без переспрашивания."""
+    llm = FakeLLM([PROFILE_REVIEW])
+    trainer = Trainer(DialogueEngine(llm), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    flow = trainer.start_profile_flow(1)
+
+    bio = "Живу в Кунцево, работаю в ЦСКА. Люблю горы, оперу и долгие прогулки по паркам после работы."
+    message = FakeMessage(f"Саша, 32\n\n{bio}")
+    await telegram_bot.on_profile_text(message)
+
+    assert flow.check.name == "Саша" and flow.check.age == 32
+    assert flow.check.phase == "menu"  # разбор прошёл сразу, «Шаг 2» не спрашивали
+    assert flow.check.text_iterations == 1
+    assert len(llm.calls) == 1
+    assert all("Шаг 2" not in text for text in message.sent)
+
+
+async def test_flow_bio_instead_of_name(store, monkeypatch):
+    """Анкета вместо имени: текст сохраняем, имя и возраст просим, потом разбор."""
+    llm = FakeLLM([PROFILE_REVIEW])
+    trainer = Trainer(DialogueEngine(llm), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    flow = trainer.start_profile_flow(1)
+
+    bio = "Живу в Кунцево, работаю в ЦСКА. Люблю горы, оперу и долгие прогулки по паркам после работы."
+    first = FakeMessage(bio)
+    await telegram_bot.on_profile_text(first)
+
+    assert flow.check.phase == "name"  # ждём имя и возраст
+    assert flow.check.bio == bio
+    assert any("Саша, 32" in text for text in first.sent)  # подсказка формата
+
+    second = FakeMessage("Саша, 32")
+    await telegram_bot.on_profile_text(second)
+
+    assert flow.check.name == "Саша" and flow.check.age == 32
+    assert flow.check.phase == "menu"
+    assert flow.check.text_iterations == 1
+    assert len(llm.calls) == 1
+
+
+def test_split_intro_bio_variants():
+    """Начало с именем и возрастом отделяется от анкеты тремя способами."""
+    age_min, age_max = load_config()["age_range"]
+    # имя и возраст на первой строке
+    assert split_intro_bio("Саша, 32\n\nАнкета про горы и скалодром", age_min, age_max) == (
+        "Саша, 32",
+        "Анкета про горы и скалодром",
+    )
+    # одна строка: первое предложение - имя и возраст
+    intro, bio = split_intro_bio(
+        "Меня зовут Саша, мне 32 года. Живу в Кунцево, работаю в ЦСКА, люблю горы "
+        "и оперу, ищу дружбу и прогулки по паркам по выходным.",
+        age_min,
+        age_max,
+    )
+    assert intro == "Меня зовут Саша, мне 32 года."
+    assert bio.startswith("Живу в Кунцево")
+    # имени и возраста в начале нет - всё сообщение считается анкетой
+    text = "Живу в Кунцево, работаю в ЦСКА, люблю горы, оперу и прогулки по паркам"
+    assert split_intro_bio(text, age_min, age_max) == (text, "")
+
+
+def test_looks_like_bio_threshold():
+    assert not looks_like_bio("Саша, 32")
+    assert not looks_like_bio("слово " * 14)
+    assert looks_like_bio("слово " * 15)
 
 
 async def test_flow_survives_restart_in_text_phase(store, monkeypatch):
