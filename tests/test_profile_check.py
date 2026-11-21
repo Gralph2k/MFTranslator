@@ -88,7 +88,7 @@ def test_config_has_limits_and_flags():
     assert len(cfg["text_green_flags"]) >= 5
     assert len(cfg["photo_red_flags"]) >= 10
     assert len(cfg["photo_green_flags"]) >= 5
-    assert cfg["recommended_length"] == [100, 400]
+    assert cfg["recommended_length"] == [50, 150]
 
 
 # --- разборы модели --------------------------------------------------------
