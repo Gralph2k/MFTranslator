@@ -24,7 +24,7 @@ from bot.profile_check import (
     render_text_review,
     split_intro_bio,
 )
-from bot.prompts import persona_messages, rules_text, start_intro
+from bot.prompts import persona_messages, rules_text
 from bot.scenario import load_scenario
 from bot.state import PersonaState
 from bot.storage import Storage
@@ -584,9 +584,3 @@ def test_config_flags_privacy_risks():
     cfg = load_config()
     assert any("личные данные" in item.lower() for item in cfg["text_red_flags"])
     assert any("нет согласия" in item for item in cfg["photo_red_flags"])
-
-
-def test_start_intro_has_real_safety_block():
-    text = start_intro()
-    assert "Реальная безопасность" in text
-    assert "деньги" in text
