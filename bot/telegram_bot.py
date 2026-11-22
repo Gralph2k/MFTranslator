@@ -523,9 +523,9 @@ async def _deliver_debrief(
     await target.answer("Секунду, собираю разбор...")
     try:
         debrief = await trainer.engine.debrief(session)
-    except Exception as exc:
+    except Exception:
         log.exception("debrief failed")
-        await target.answer(f"Разбор не получился: {exc}. Попробуй ещё раз позже.")
+        await target.answer("Разбор не получился - сервер задумался. Попробуй ещё раз через пару минут.")
         return
 
     text = debrief.render(session.scenario)
@@ -720,9 +720,9 @@ async def _review_text(
             temperature=0.3,
         )
         review = parse_text_review(parse_json_object(raw))
-    except Exception as exc:
+    except Exception:
         log.exception("разбор анкеты не получился")
-        await target.answer(f"Разбор не получился: {exc}. Пришли текст ещё раз.")
+        await target.answer("Разбор не получился - сервер задумался. Пришли текст ещё раз.")
         return
 
     rendered = render_text_review(review)
@@ -897,9 +897,9 @@ async def _evaluate_photos(
             images,
         )
         review = parse_photo_review(data, expected=len(images))
-    except Exception as exc:
+    except Exception:
         log.exception("оценка фото не получилась")
-        await target.answer(f"Не получилось оценить фото: {exc}. Попробуй ещё раз.")
+        await target.answer("Не получилось оценить фото - сервер задумался. Попробуй ещё раз.")
         return
 
     rendered = render_photo_review(review)
@@ -1164,10 +1164,11 @@ async def on_text(message: Message) -> None:
             trainer.persist(message.from_user.id, session)
             await _send_long(message, safety_message(trainer.safety_resources))
             return
-        except Exception as exc:
+        except Exception:
             log.exception("reply failed")
             await message.answer(
-                f"Не получилось ответить: {exc}. Попробуй отправить сообщение ещё раз."
+                "Не получилось ответить - сервер задумался. "
+                "Попробуй отправить сообщение ещё раз."
             )
             return
 
