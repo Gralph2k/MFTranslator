@@ -931,11 +931,6 @@ async def _finish_flow(
     """Меню героинь после проверки анкеты. Лок уже взят."""
     completed = bool(flow.check.bio.strip())
     trainer.close_profile_flow(telegram_id, completed=completed)
-    # Короткое напоминание на выходе из флоу: дальше - реальные люди и встречи.
-    await target.answer(
-        "Перед реальной встречей: публичное место, скажи другу, куда идёшь, "
-        "и не отправляй деньги - никому и никогда в переписке."
-    )
     await target.answer("Выбери героиню:", reply_markup=heroines_menu())
 
 
