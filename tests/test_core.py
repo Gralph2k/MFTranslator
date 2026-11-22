@@ -417,3 +417,29 @@ async def test_demo_llm_routes_by_role_not_by_substring():
     llm = DemoLLM(["живая реплика"], _demo_debrief())
     reply = await llm.complete(persona_messages(eva, state, []))
     assert reply == "живая реплика"
+
+
+def test_model_long_dashes_become_hyphens():
+    """Модель любит «—»; живые тексты проекта - на дефисах."""
+    from bot.engine import _parse_debrief, _trim
+
+    assert _trim("Года три уже — в зале скучно") == "Года три уже - в зале скучно"
+    assert _trim("Погоди–ка") == "Погоди-ка"
+
+    debrief = _parse_debrief(
+        {
+            "scores": {},
+            "summary": "Разговор шёл — неровно",
+            "strengths": ["Заметил её паузу — и не полез дальше"],
+            "growth": [],
+            "moments": [{"quote": "Ну… я — редактор", "why": "шаг к нему"}],
+            "rewrite": {"original": "Расслабься", "better": "Дай минуту — я рядом"},
+            "next_time": "Пауза — тоже ход",
+        },
+        load_scenario(),
+    )
+    assert "—" not in debrief.summary
+    assert "—" not in debrief.strengths[0]
+    assert "—" not in debrief.next_time
+    assert "—" not in debrief.rewrite["better"]
+    assert "–" not in debrief.rewrite["better"]

@@ -277,6 +277,8 @@ def _parse_persona_reply(raw: str) -> tuple[str, dict[str, Any] | None, bool]:
 
 
 def _trim(text: str) -> str:
+    # Длинные тире из модели - в дефисы: живые тексты проекта на дефисах.
+    text = text.replace("—", "-").replace("–", "-")
     text = " ".join(text.split())
     if len(text) <= MAX_REPLY_CHARS:
         return text
@@ -290,6 +292,12 @@ def _as_text_list(value: Any, limit: int = 4) -> list[str]:
         return []
     result = [str(item).strip() for item in value if str(item).strip()]
     return result[:limit]
+
+
+def _hyphens(value: Any) -> str:
+    """Текстовая строка разбора: чистая и с дефисами вместо длинных тире."""
+    text = str(value or "").strip()
+    return text.replace("—", "-").replace("–", "-")
 
 
 def _parse_debrief(data: dict[str, Any], scenario: Scenario) -> Debrief:
@@ -307,8 +315,8 @@ def _parse_debrief(data: dict[str, Any], scenario: Scenario) -> Debrief:
             if isinstance(moment, dict):
                 moments.append(
                     {
-                        "quote": str(moment.get("quote", "")).strip(),
-                        "why": str(moment.get("why", "")).strip(),
+                        "quote": _hyphens(moment.get("quote", "")),
+                        "why": _hyphens(moment.get("why", "")),
                     }
                 )
 
@@ -316,18 +324,18 @@ def _parse_debrief(data: dict[str, Any], scenario: Scenario) -> Debrief:
     rewrite = {}
     if isinstance(rewrite_raw, dict):
         rewrite = {
-            "original": str(rewrite_raw.get("original", "")).strip(),
-            "better": str(rewrite_raw.get("better", "")).strip(),
+            "original": _hyphens(rewrite_raw.get("original", "")),
+            "better": _hyphens(rewrite_raw.get("better", "")),
         }
 
     return Debrief(
         scores=scores,
-        summary=str(data.get("summary", "")).strip(),
-        strengths=_as_text_list(data.get("strengths")),
-        growth=_as_text_list(data.get("growth")),
+        summary=_hyphens(data.get("summary", "")),
+        strengths=[_hyphens(item) for item in _as_text_list(data.get("strengths"))],
+        growth=[_hyphens(item) for item in _as_text_list(data.get("growth"))],
         moments=moments,
         rewrite=rewrite,
-        next_time=str(data.get("next_time", "")).strip(),
+        next_time=_hyphens(data.get("next_time", "")),
         total=sum(scores.values()),
         max_total=scenario.max_score,
     )
