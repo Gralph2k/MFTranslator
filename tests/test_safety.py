@@ -91,3 +91,10 @@ async def test_engine_stops_scene_and_does_not_call_model(scenario):
     assert session.history[-1]["role"] == "user"
     assert "Я больше не хочу жить" in session.history[-1]["content"]
     assert session.user_turns == 1
+
+
+def test_safety_message_resume_hint_replaces_restart_line():
+    """У прерванного занятия своя команда возврата: /check для анкеты."""
+    text = safety_message(resume_hint="Вернуться к проверке можно командой /check.")
+    assert "/check" in text
+    assert "/restart" not in text

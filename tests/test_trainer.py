@@ -318,3 +318,58 @@ async def test_rapid_messages_of_one_user_are_serialized(store, monkeypatch):
     # Строгое чередование после opening: ответы не перемешались.
     assert roles == ["assistant", "user", "assistant", "user", "assistant"]
     assert session.user_turns == 2
+
+
+async def test_crisis_bio_stops_profile_flow(store, monkeypatch):
+    """Кризисная фраза в тексте анкеты останавливает флоу, а не идёт в разбор."""
+    trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    flow = trainer.start_profile_flow(1)
+    trainer.save_flow(flow, name="Саша", age=32, phase="bio")
+
+    message = FakeMessage("Живу один, всё надоело, хочу умереть")
+    await telegram_bot.on_profile_text(message)
+
+    assert trainer.get_profile_flow(1) is None
+    assert any("112" in text for text in message.sent)
+
+
+class FakeMediaMessage:
+    """Медиа-сообщение: фото/голосовое есть, текста нет."""
+
+    def __init__(self, user_id: int = 1) -> None:
+        self.from_user = SimpleNamespace(id=user_id)
+        self.bot = None
+        self.sent: list[str] = []
+        self.photo = [SimpleNamespace(file_id="f1")]
+        self.media_group_id = None
+        self.voice = SimpleNamespace(duration=1)
+        self.sticker = None
+
+    async def answer(self, text: str, **kwargs) -> None:
+        self.sent.append(text)
+
+
+async def test_media_in_dialogue_gets_text_answer(store, monkeypatch):
+    """Фото/голосовое при живой сцене не молчат: сцена живёт текстом."""
+    trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    trainer.start_session(telegram_id=1, scenario_id="first_message/vera")
+
+    photo = FakeMediaMessage()
+    await telegram_bot.on_photo(photo)
+    assert any("переписка живёт текстом" in text for text in photo.sent)
+
+    voice = FakeMediaMessage()
+    await telegram_bot.on_other_media(voice)
+    assert any("переписка живёт текстом" in text for text in voice.sent)
+
+
+async def test_media_without_session_stays_silent(store, monkeypatch):
+    """Без сцены и без флоу анкеты медиа по-прежнему игнорируется."""
+    trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+
+    message = FakeMediaMessage()
+    await telegram_bot.on_other_media(message)
+    assert message.sent == []

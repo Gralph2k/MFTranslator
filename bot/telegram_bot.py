@@ -56,7 +56,7 @@ from .profile_check import (
     t,
 )
 from .prompts import backstory_text, format_transcript, profile_text, rules_text, start_intro
-from .safety import CrisisDetected, safety_message
+from .safety import CrisisDetected, detect_crisis, safety_message
 from .scenario import Scenario, ScenarioError, load_scenario
 from .state import PersonaState
 from .storage import Storage, StoredProfileCheck, StoredSession
@@ -687,6 +687,22 @@ async def _review_text(
     bio: str,
 ) -> None:
     """Разбор текста анкеты: deepseek, счёт считает код. Лок уже взят."""
+    if detect_crisis(bio):
+        # Кризисный текст останавливает флоу - как диалог в engine.reply:
+        # продолжать разбор в такой момент нельзя.
+        trainer.close_profile_flow(telegram_id, completed=False)
+        await _send_long(
+            target,
+            safety_message(
+                trainer.safety_resources,
+                resume_hint=(
+                    "Проверка анкеты на этом остановлена. Вернуться к ней можно "
+                    "командой /check, когда будет безопасно."
+                ),
+            ),
+        )
+        return
+
     cfg = load_config()
     if len(bio) > cfg["max_length"]:
         await target.answer(t("bio_too_long", length=len(bio), max=cfg["max_length"]))
@@ -915,6 +931,11 @@ async def _finish_flow(
     """Меню героинь после проверки анкеты. Лок уже взят."""
     completed = bool(flow.check.bio.strip())
     trainer.close_profile_flow(telegram_id, completed=completed)
+    # Короткое напоминание на выходе из флоу: дальше - реальные люди и встречи.
+    await target.answer(
+        "Перед реальной встречей: публичное место, скажи другу, куда идёшь, "
+        "и не отправляй деньги - никому и никогда в переписке."
+    )
     await target.answer("Выбери героиню:", reply_markup=heroines_menu())
 
 
@@ -995,14 +1016,33 @@ class _PhotoCollector:
 _collector = _PhotoCollector()
 
 
+async def _media_fallback(message: Message, trainer: Trainer) -> None:
+    """Фото/голосовое/стикер при живой сцене: сцена живёт текстом.
+
+    Молчать - хуже: игрок решает, что сообщение доставлено и прочитано, и ждёт
+    ответа, которого не будет.
+    """
+    session = trainer.get_session(message.from_user.id)
+    if session is None or session.is_over:
+        return
+    if session.scenario.is_call:
+        text = "Ты говоришь по телефону - картинку не показать. Скажи словами."
+    elif session.scenario.is_correspondence:
+        text = "Эта переписка живёт текстом: фото она не получит. Напиши словами."
+    else:
+        text = "Здесь говорят словами - опиши, что хотел показать или сделать."
+    await message.answer(text)
+
+
 @router.message(F.photo)
 async def on_photo(message: Message) -> None:
     trainer = _trainer(message)
     if message.photo is None:
         return
-    # Фото вне «Проверки анкеты» бот игнорирует - как и до неё.
+    # Фото вне «Проверки анкеты» - к сцене, если она идёт; без сцены молчим.
     flow = trainer.get_profile_flow(message.from_user.id)
     if flow is None:
+        await _media_fallback(message, trainer)
         return
     if flow.check.phase != "photos":
         # На фазах имени и текста фото молча ждёт своего этапа; в «menu»
@@ -1018,6 +1058,14 @@ async def on_photo(message: Message) -> None:
         _collector.add(group_id, message)
         return
     await _handle_photo_batch(message, trainer, [message])
+
+
+@router.message(F.voice | F.video_note | F.sticker)
+async def on_other_media(message: Message) -> None:
+    """Голосовые, видеосообщения и стикеры в проверку анкеты не нужны, а в сцене
+    у них один честный ответ: она услышит только текст."""
+    trainer = _trainer(message)
+    await _media_fallback(message, trainer)
 
 
 async def _profile_text_filter(message: Message) -> bool:
