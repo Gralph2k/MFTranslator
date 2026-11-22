@@ -14,7 +14,7 @@
 
 | набор | куда | файлы | сколько |
 |---|---|---|---|
-| эталон | вне `scenarios/` | `prompts/reference/vera-cafe-base.jpg` | 1 (из 3-4 попыток) |
+| эталон | вне `scenarios/` | `prompts/reference/vera-base.jpg` | 1 (из 3-4 попыток) |
 | анкета | `scenarios/first_message/vera/images/` | `profile_1..4.jpg` | 4 |
 | эмоции | `scenarios/first_date/vera/images/` | `calm` … `tears` | 10 |
 | звонок | `scenarios/first_call/vera/images/` | `call.jpg` | 1 |
@@ -48,11 +48,11 @@
 
 1. **Эталон - один раз.** Сгенерируйте 3-4 варианта портрета в кафе (шаг 1), выберите
    лучший. Это единственный раз, когда лицо создаётся с нуля.
-2. **Сохраните утверждённый эталон вне сценариев** - `prompts/reference/vera-cafe-base.jpg`.
+2. **Сохраните утверждённый эталон вне сценариев** - `prompts/reference/vera-base.jpg`.
    Бот эту папку не читает; если положить эталон в `scenarios/`, `bot/faces.py` может
    принять его за кадр настроения.
 3. **Сначала десять эмоций.** Все десять делаются от эталона: прикрепляйте
-   `vera-cafe-base.jpg` и меняйте только выражение лица. Фон, свет, поза и одежда
+   `vera-base.jpg` и меняйте только выражение лица. Фон, свет, поза и одежда
    остаются как на эталоне.
 4. **Потом четыре кадра анкеты.** Сначала `profile_1.jpg` (парк), он утверждается; для
    `profile_2..4.jpg` прикрепляйте эталон **и** `profile_1.jpg`.
@@ -133,7 +133,7 @@ watermark, no logo, no other people, no jewelry, no glasses.
 
 ### Общий шаблон: меняется только выражение
 
-Прикрепите `vera-cafe-base.jpg` и используйте этот текст, подставив выражение из
+Прикрепите `vera-base.jpg` и используйте этот текст, подставив выражение из
 таблицы ниже:
 
 ```
@@ -519,7 +519,7 @@ no watermark, no logo, no phone in her hands, no other people.
 ## Имена файлов и связка с ботом
 
 ```
-prompts/reference/vera-cafe-base.jpg          эталон, бот его не читает
+prompts/reference/vera-base.jpg          эталон, бот его не читает
 
 scenarios/first_message/vera/images/profile_1.jpg  анкета: парк, белый
 scenarios/first_message/vera/images/profile_2.jpg  анкета: сальса, пыльно-розовый

@@ -63,7 +63,13 @@ async def check_telegram(settings: Settings) -> Check:
         check.hint = "Посмотрите тело ответа Telegram в логах."
         return check
 
-    data = response.json()
+    try:
+        data = response.json()
+    except ValueError:
+        # HTTP 200, но тело не JSON: прокси или страница captive-портала.
+        check.detail = "Telegram ответил 200, но тело не JSON (прокси?)"
+        check.hint = "Проверьте TELEGRAM_PROXY в .env и доступ к api.telegram.org."
+        return check
     if not data.get("ok"):
         check.detail = f"Telegram ответил ошибкой: {data.get('description')}"
         return check

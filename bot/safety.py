@@ -78,8 +78,12 @@ def detect_crisis(text: str) -> bool:
     return any(marker in haystack for marker in CRISIS_MARKERS)
 
 
-def safety_message(resources: str | None = None) -> str:
-    """Текст помощи. Контакты задаются в SAFETY_RESOURCES, а не выдумываются кодом."""
+def safety_message(resources: str | None = None, resume_hint: str | None = None) -> str:
+    """Текст помощи. Контакты задаются в SAFETY_RESOURCES, а не выдумываются кодом.
+
+    `resume_hint` - как вернуться к прерванному занятию (у диалога и проверки
+    анкеты команды разные); без него - стандартная подсказка про /restart.
+    """
     lines = [
         "Стоп. То, что ты написал, важнее любого упражнения.",
         "",
@@ -100,8 +104,11 @@ def safety_message(resources: str | None = None) -> str:
     lines.extend(
         [
             "",
-            "Разговор с персонажем на этом закончен. Вернуться можно командой /restart, "
-            "когда будет безопасно.",
+            resume_hint
+            or (
+                "Разговор с персонажем на этом закончен. Вернуться можно командой /restart, "
+                "когда будет безопасно."
+            ),
         ]
     )
     return "\n".join(lines)

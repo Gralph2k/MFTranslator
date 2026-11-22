@@ -15,7 +15,7 @@ from typing import Any
 
 import httpx
 
-from .llm import LLMError, parse_json_object
+from .llm import LLMError, LLMPermanentError, parse_json_object
 from .tls import httpx_verify
 
 
@@ -86,7 +86,8 @@ class VisionLLM:
                 if response.status_code == 429 or response.status_code >= 500:
                     last_error = f"HTTP {response.status_code}"
                     raise LLMError(last_error)
-                response.raise_for_status()
+                if 400 <= response.status_code < 500:
+                    raise LLMPermanentError(f"HTTP {response.status_code}")
                 data = response.json()
                 choice = (data.get("choices") or [{}])[0]
                 text = (choice.get("message") or {}).get("content")
@@ -94,7 +95,11 @@ class VisionLLM:
                     last_error = f"пустой ответ (finish={choice.get('finish_reason')})"
                     raise LLMError(last_error)
                 return parse_json_object(text)
-            except (httpx.HTTPError, LLMError, KeyError, IndexError) as exc:
+            except LLMPermanentError:
+                raise
+            except (httpx.HTTPError, LLMError, KeyError, IndexError, ValueError) as exc:
+                # ValueError ловит и json.JSONDecodeError: не-JSON тело с HTTP 200.
+                last_error = str(exc) or type(exc).__name__
                 last_error = str(exc) or type(exc).__name__
                 if attempt >= self.max_retries:
                     break

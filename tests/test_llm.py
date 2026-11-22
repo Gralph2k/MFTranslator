@@ -114,3 +114,80 @@ async def test_plain_answer_is_returned_as_is():
         )
     finally:
         await llm.aclose()
+
+
+async def test_permanent_4xx_is_not_retried(no_sleep):
+    """401 повтором не лечится: трижды ждать одно и то же отказное сообщение незачем."""
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(401, json={"error": {"message": "bad key"}})
+
+    llm = _llm(handler)
+    try:
+        with pytest.raises(LLMError, match="HTTP 401"):
+            await llm.complete([{"role": "user", "content": "hi"}])
+    finally:
+        await llm.aclose()
+
+    assert len(requests) == 1
+
+
+async def test_non_json_200_body_is_retried(no_sleep):
+    """Прокси или captive-портал может вернуть HTML с кодом 200 - это ретрай."""
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if len(requests) == 1:
+            return httpx.Response(200, text="<html>login to wifi</html>")
+        return _message("Пришёл.")
+
+    llm = _llm(handler)
+    try:
+        assert await llm.complete([{"role": "user", "content": "hi"}]) == "Пришёл."
+    finally:
+        await llm.aclose()
+
+    assert len(requests) == 2
+
+
+async def test_empty_retry_counter_stays_out_of_request_body(no_sleep):
+    """Служебный счётчик пустых ответов - локальный, тело запроса к API чистое."""
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return _message("")
+
+    llm = _llm(handler)
+    try:
+        with pytest.raises(LLMError, match="3 попыток"):
+            await llm.complete([{"role": "user", "content": "hi"}], json_mode=True)
+    finally:
+        await llm.aclose()
+
+    bodies = [json.loads(r.read()) for r in requests]
+    assert len(bodies) == 3
+    assert all("_empty_retries" not in body for body in bodies)
+
+
+async def test_persona_empty_answers_get_no_json_nudge(no_sleep):
+    """Напоминание про JSON - только JSON-вызовам; реплике персонажа оно бы навредило."""
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if len(requests) <= 2:
+            return _message("")
+        return _message("Скажу иначе.")
+
+    llm = _llm(handler)
+    try:
+        assert await llm.complete([{"role": "user", "content": "hi"}]) == "Скажу иначе."
+    finally:
+        await llm.aclose()
+
+    bodies = [json.loads(r.read()) for r in requests]
+    assert all("JSON-объектом" not in body["messages"][-1]["content"] for body in bodies)

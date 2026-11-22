@@ -39,12 +39,22 @@ class PersonaState:
     @classmethod
     def from_mapping(cls, data: dict[str, Any]) -> "PersonaState":
         base = cls()
+        # Восстановление из базы - тоже точка входа данных в промпты: mood и
+        # заметки чистим так же, как при живом ходе (строки, записанные до
+        # появления чистки, не должны попадать в промпты как есть).
+        raw_notes = data.get("notes", [])
+        notes: list[str] = []
+        if isinstance(raw_notes, list):
+            for note in raw_notes:
+                text = sanitize_note(note)
+                if text and text not in notes:
+                    notes.append(text)
         return cls(
-            mood=str(data.get("mood", base.mood)),
+            mood=clamp_text(str(data.get("mood", base.mood)), MAX_MOOD_LEN),
             trust=_clamp(data.get("trust"), base.trust),
             openness=_clamp(data.get("openness"), base.openness),
             energy=_clamp(data.get("energy"), base.energy),
-            notes=[str(n) for n in data.get("notes", []) if str(n).strip()][-MAX_NOTES:],
+            notes=notes[-MAX_NOTES:],
         )
 
     def apply(self, delta: dict[str, Any]) -> None:

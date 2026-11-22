@@ -13,7 +13,7 @@ from typing import Any
 from .config import Settings, load_settings
 from .engine import DialogueEngine
 from .heroines import story_scenarios
-from .llm import DeepSeekLLM, LLM
+from .llm import DeepSeekLLM, LLM, parse_json_object
 from .prompts import backstory_text, profile_text, rules_text
 from .safety import CrisisDetected, safety_message
 from .scenario import load_scenario
@@ -235,7 +235,9 @@ async def run_check(provider: str) -> int:
         raw = await llm.complete(
             consultant_messages(name, age, bio), json_mode=True, temperature=0.3
         )
-        review = parse_text_review(json.loads(raw))
+        # parse_json_object, а не голый json.loads: модель любит обернуть
+        # JSON в ```...``` или прицепить фразу до объекта.
+        review = parse_text_review(parse_json_object(raw))
     except Exception as exc:
         print(f"[разбор не получился: {exc}]")
         return 1

@@ -50,7 +50,11 @@ def wrap_player_text(text: str, tag: str = REPLICA_TAG) -> str:
     stripped = text.strip()
     opening, closing = f"<{tag}>", f"</{tag}>"
     if stripped.startswith(opening) and stripped.endswith(closing):
-        return stripped
+        # Совпадение краёв ещё не значит, что размечали мы: игрок мог собрать
+        # «правильные» края руками, а внутрь положить подделку. Внутренность
+        # чистим так же, как при обычной обёртке.
+        inner = stripped[len(opening) : -len(closing)]
+        return opening + _FORGED.sub(_break_forged, inner) + closing
     return f"{opening}\n{_FORGED.sub(_break_forged, stripped)}\n{closing}"
 
 
@@ -60,6 +64,22 @@ def strip_player_tags(text: str) -> str:
     cleaned = _FORGED.sub("", text)
     cleaned = "\n".join(line.rstrip() for line in cleaned.splitlines())
     return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+
+
+def contains_end_marker(text: str) -> bool:
+    """Маркер конца где угодно в тексте - в любом виде."""
+    return bool(_MARKER.search(text))
+
+
+def ends_with_end_marker(text: str) -> bool:
+    """Маркер конца в конце текста - в любом регистре и с любыми пробелами
+    внутри скобок: модель пишет и «[[Конец]]», и «[[ конец ]]»."""
+    return bool(re.search(r"\[\[\s*конец\s*\]\]\s*$", text, re.IGNORECASE))
+
+
+def strip_end_marker(text: str) -> str:
+    """Вырезает все вхождения маркера конца - в любом виде."""
+    return _MARKER.sub("", text).strip()
 
 
 def sanitize_note(text: str, limit: int = MAX_NOTE_LEN) -> str:

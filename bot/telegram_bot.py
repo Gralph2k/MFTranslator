@@ -529,6 +529,15 @@ async def _deliver_debrief(
         return
 
     text = debrief.render(session.scenario)
+    # Сначала доставляем игроку, потом фиксируем в базе и памяти: сбой отправки
+    # не должен навсегда отнимать разбор (раньше сессия закрывалась до отправки,
+    # и повторный /finish получал «Разбор уже был выше»). Если отправка упала -
+    # ничего не помечено, игрок просто повторяет /finish.
+    await _send_face(target, trainer, session, "Так она закончила разговор.")
+    await _send_long(target, text)
+    await target.answer(
+        "Что дальше?", reply_markup=after_finish_menu(session.scenario.id)
+    )
     trainer.persist(telegram_id, session)
     if session.session_id is not None:
         trainer.storage.save_debrief(session.session_id, text)
@@ -538,11 +547,6 @@ async def _deliver_debrief(
         target.bot,
         trainer,
         _scenario_report(telegram_id, session, text),
-    )
-    await _send_face(target, trainer, session, "Так она закончила разговор.")
-    await _send_long(target, text)
-    await target.answer(
-        "Что дальше?", reply_markup=after_finish_menu(session.scenario.id)
     )
 
 

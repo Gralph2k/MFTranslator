@@ -6,9 +6,14 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from .guards import wrap_player_text
+from .guards import (
+    contains_end_marker,
+    ends_with_end_marker,
+    strip_end_marker,
+    wrap_player_text,
+)
 from .llm import LLM, LLMError, parse_json_object
-from .prompts import END_MARKER, debrief_messages, persona_messages, state_messages
+from .prompts import debrief_messages, persona_messages, state_messages
 from .safety import CrisisDetected, detect_crisis
 from .scenario import RubricItem, Scenario
 from .state import PersonaState
@@ -35,15 +40,16 @@ FAREWELL_ENDINGS = (
 
 
 def _ends_with_farewell(text: str) -> bool:
-    tail = " ".join(text.split()).rstrip(" .!?…)\"'»").lower()
+    tail = " ".join(text.split()).rstrip(" .!?…)\"'»]").lower()
     return any(tail.endswith(marker) for marker in FAREWELL_ENDINGS)
 
 
 def _ends_with_marker(text: str) -> bool:
     """Маркер конца засчитывается только в конце текста: модель иногда
     повторяет [[конец]] по просьбе игрока в середине реплики, и такой
-    маркер сессию закрывать не должен."""
-    return text.rstrip().endswith(END_MARKER)
+    маркер сессию закрывать не должен. Регулярка из guards ловит и варианты
+    вроде «[[Конец]]» и «[[ конец ]]»."""
+    return ends_with_end_marker(text)
 
 
 @dataclass
@@ -179,10 +185,10 @@ class DialogueEngine:
         # Маркер считается только в конце реплики: вымоленный командой маркер
         # в середине текста сессию не закрывает.
         marker_ended = _ends_with_marker(raw) or _ends_with_marker(reply)
-        if END_MARKER in reply:
+        if contains_end_marker(reply):
             # Маркер - служебный артефакт: из текста реплики его вырезаем
             # всегда, чтобы игрок его не видел и не собирал по частям.
-            reply = reply.replace(END_MARKER, "").strip()
+            reply = strip_end_marker(reply)
         if marker_ended:
             log.info(
                 "сессия %s (%s): героиня закончила разговор маркером",

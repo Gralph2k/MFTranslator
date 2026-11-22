@@ -16,6 +16,11 @@ class LLMError(RuntimeError):
     """Модель недоступна или ответила не то."""
 
 
+class LLMPermanentError(LLMError):
+    """Сбой, который повтором не лечится: 401/403 и прочие 4xx.
+    Ретраить его - трижды ждать одно и то же отказное сообщение."""
+
+
 class LLM(Protocol):
     async def complete(
         self,
@@ -70,13 +75,17 @@ class DeepSeekLLM:
             payload["response_format"] = {"type": "json_object"}
 
         last_error: str = "неизвестная ошибка"
+        # Счётчик пустых ответов - локальная переменная, а не поле payload:
+        # служебные ключи не должны уезжать в теле запроса к API.
+        empty_retries = 0
         for attempt in range(1, self.max_retries + 1):
             try:
                 response = await client.post("/chat/completions", json=payload)
                 if response.status_code == 429 or response.status_code >= 500:
                     last_error = f"HTTP {response.status_code}"
                     raise LLMError(last_error)
-                response.raise_for_status()
+                if 400 <= response.status_code < 500:
+                    raise LLMPermanentError(f"HTTP {response.status_code}")
                 data = response.json()
                 choice = (data.get("choices") or [{}])[0]
                 message = choice.get("message") or {}
@@ -89,11 +98,11 @@ class DeepSeekLLM:
                         f"пустой ответ (finish={choice.get('finish_reason')}, "
                         f"fields={sorted(message)})"
                     )
-                    empty_retries = payload.setdefault("_empty_retries", 0)
-                    payload["_empty_retries"] = empty_retries + 1
                     if empty_retries == 0 and "response_format" in payload:
                         payload.pop("response_format")
-                    elif empty_retries == 1:
+                    elif empty_retries == 1 and json_mode:
+                        # Подсказка про JSON нужна только JSON-вызовам; реплике
+                        # персонажа такое требование только испортит ответ.
                         payload["messages"] = list(payload["messages"]) + [
                             {
                                 "role": "user",
@@ -103,9 +112,14 @@ class DeepSeekLLM:
                                 ),
                             }
                         ]
+                    empty_retries += 1
                     raise LLMError(last_error)
                 return content
-            except (httpx.HTTPError, LLMError, KeyError, IndexError) as exc:
+            except LLMPermanentError:
+                raise
+            except (httpx.HTTPError, LLMError, KeyError, IndexError, ValueError) as exc:
+                # ValueError - это и json.JSONDecodeError: не-JSON тело с HTTP 200
+                # (прокси, страница портала) тоже заслуживает повтора.
                 last_error = str(exc) or type(exc).__name__
                 if attempt >= self.max_retries:
                     break
