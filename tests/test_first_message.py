@@ -490,3 +490,34 @@ def test_debrief_has_computed_question_facts(scenario):
     assert "Посчитано кодом" in system
     assert "всего «?»: 2" in system
     assert "реплик с двумя и более вопросами: 1" in system
+
+
+def test_heroine_never_names_the_slot_herself(scenario):
+    """Окно своих дел - фактом можно; слот «давай в семь» и «наберу сама» - нет.
+
+    Живые сессии 23-24.11: Ева при высокой открытости сама называла время
+    и «наберу сама» - и забирала упражнение у игрока.
+    """
+    text = state_guidance(PersonaState(trust=0.8, openness=0.9, energy=0.7), scenario)
+    assert "Наберу сама" in text
+    assert "окно своих дел" in text
+
+    low = state_guidance(PersonaState(trust=0.4, openness=0.2, energy=0.4), scenario)
+    assert "Наберу сама" in low  # правило выше уровней открытости
+
+
+def test_no_score_language_in_any_medium():
+    """«Засчитано» и «плюс тебе» звучали в созвоне и вживую - запрет везде."""
+    call = load_scenario("first_call/vera")
+    call_prompt = persona_system_prompt(
+        call, PersonaState.from_mapping(call.initial_state)
+    )
+    assert "засчитано" in call_prompt
+    assert "ты мимо" in call_prompt
+    assert "Ты не экзаменатор" not in call_prompt  # переписочный блок не приезжает
+
+    date = load_scenario("first_date/vera")
+    date_prompt = persona_system_prompt(
+        date, PersonaState.from_mapping(date.initial_state)
+    )
+    assert "плюс тебе" in date_prompt
