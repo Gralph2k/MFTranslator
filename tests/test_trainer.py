@@ -350,19 +350,45 @@ class FakeMediaMessage:
         self.sent.append(text)
 
 
-async def test_media_in_dialogue_gets_text_answer(store, monkeypatch):
-    """Фото/голосовое при живой сцене не молчат: сцена живёт текстом."""
+async def test_media_in_dialogue_gets_heroine_reply(store, monkeypatch):
+    """Фото при живой сцене: героиня в роли жалуется на сеть и просит описать.
+
+    Реплика генерируется в её голосе, ход игрока не списывается, а вложение
+    остаётся в стенограмме как «(прислал фотографию)» - разбор увидит.
+    """
+    reply = "Не грузится ничего, сеть тут отвратительная. Что там? Расскажи словами."
+    trainer = Trainer(
+        DialogueEngine(FakeLLM([reply, reply])), store, load_scenario(), with_faces=False
+    )
+    monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
+    session = trainer.start_session(telegram_id=1, scenario_id="first_message/vera")
+    turns_before = session.user_turns
+
+    photo = FakeMediaMessage()
+    await telegram_bot.on_photo(photo)
+    assert any("Расскажи словами" in text for text in photo.sent)
+    session = trainer.get_session(1)
+    assert session.user_turns == turns_before  # медиа - не ход игрока
+    assert session.history[-1]["content"] == reply
+    assert "(прислал фотографию)" in session.history[-2]["content"]
+
+    voice = FakeMediaMessage()
+    await telegram_bot.on_other_media(voice)
+    assert any("Что там" in text for text in voice.sent)
+
+
+async def test_media_fallback_when_llm_fails(store, monkeypatch):
+    """Модель молчит - героиня всё же отвечает: шаблон про плохой интернет."""
     trainer = Trainer(DialogueEngine(FakeLLM([])), store, load_scenario(), with_faces=False)
     monkeypatch.setattr(telegram_bot, "_trainer_instance", trainer)
     trainer.start_session(telegram_id=1, scenario_id="first_message/vera")
 
     photo = FakeMediaMessage()
     await telegram_bot.on_photo(photo)
-    assert any("переписка живёт текстом" in text for text in photo.sent)
+    assert any("не грузится" in text for text in photo.sent)
 
-    voice = FakeMediaMessage()
-    await telegram_bot.on_other_media(voice)
-    assert any("переписка живёт текстом" in text for text in voice.sent)
+    session = trainer.get_session(1)
+    assert session.history[-2]["content"].startswith("<реплика_игрока>")
 
 
 async def test_media_without_session_stays_silent(store, monkeypatch):

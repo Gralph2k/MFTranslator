@@ -23,8 +23,9 @@ from aiogram.types import (
 )
 
 from .config import Settings, load_settings
+from .guards import END_MARKER, wrap_player_text
 from .email_debug import send_debug_email
-from .engine import DialogueEngine, DialogueSession
+from .engine import DialogueEngine, DialogueSession, _trim
 from .faces import emotion_for_state, face_path
 from .launcher import clear_pid, write_pid
 from .llm import DeepSeekLLM, LLM, parse_json_object
@@ -55,7 +56,14 @@ from .profile_check import (
     split_intro_bio,
     t,
 )
-from .prompts import backstory_text, format_transcript, profile_text, rules_text, start_intro
+from .prompts import (
+    backstory_text,
+    format_transcript,
+    persona_messages,
+    profile_text,
+    rules_text,
+    start_intro,
+)
 from .safety import CrisisDetected, detect_crisis, safety_message
 from .scenario import Scenario, ScenarioError, load_scenario
 from .state import PersonaState
@@ -1011,22 +1019,62 @@ class _PhotoCollector:
 _collector = _PhotoCollector()
 
 
-async def _media_fallback(message: Message, trainer: Trainer) -> None:
-    """Фото/голосовое/стикер при живой сцене: сцена живёт текстом.
+async def _media_fallback(message: Message, trainer: Trainer, kind: str = "фотографию") -> None:
+    """Фото/голосовое/стикер при живой сцене: героиня отвечает в роли.
 
-    Молчать - хуже: игрок решает, что сообщение доставлено и прочитано, и ждёт
-    ответа, которого не будет.
+    Внутри вымысла вложение «не загрузилось» - сеть плохая. Сцена не ломается
+    молчанием и системным голосом: она жалуется на интернет по-своему и просит
+    рассказать словами, что там, - а игрок описывает, как в реальном чате.
     """
-    session = trainer.get_session(message.from_user.id)
-    if session is None or session.is_over:
-        return
-    if session.scenario.is_call:
-        text = "Ты говоришь по телефону - картинку не показать. Скажи словами."
-    elif session.scenario.is_correspondence:
-        text = "Эта переписка живёт текстом: фото она не получит. Напиши словами."
-    else:
-        text = "Здесь говорят словами - опиши, что хотел показать или сделать."
-    await message.answer(text)
+    async with trainer.user_lock(message.from_user.id):
+        session = trainer.get_session(message.from_user.id)
+        if session is None or session.is_over:
+            return
+        scenario = session.scenario
+        if scenario.is_correspondence or scenario.is_call:
+            trouble = (
+                f"он прислал {kind}, но у тебя оно не загрузилось: сеть плохая, "
+                "крутилка крутится, и всё. Пожалуйся на это коротко и по-своему "
+                "и попроси его рассказать словами, что там. Это не красная линия "
+                "и не конец разговора: просто техника подвела."
+            )
+            fallback = (
+                "Ой, сеть тут отвалилась - ничего не грузится. Расскажи словами, "
+                "что там?"
+            )
+        else:
+            trouble = (
+                "он протягивает тебе телефон и хочет что-то показать или включить, "
+                "но тебе не разобрать: не видно, не слышно. Скажи коротко, что не "
+                "выходит, и попроси рассказать словами."
+            )
+            fallback = "Мне отсюда не видно. Расскажи, что там?"
+
+        # Одна реплика в её голосе, ход игрока не списывается.
+        note = wrap_player_text(f"(прислал {kind})")
+        messages = persona_messages(
+            scenario,
+            session.state,
+            session.history + [{"role": "user", "content": note}],
+            previous=session.previous,
+            turns_left=session.turns_left,
+            player_profile=session.player_profile,
+        )
+        messages[0]["content"] += "\n\nСлужебная вводная этого хода (не его слова): " + trouble
+        reply = fallback
+        try:
+            raw = await trainer.engine.llm.complete(
+                messages, json_mode=False, temperature=0.85
+            )
+            cleaned = raw.replace(END_MARKER, "").strip()
+            if cleaned:
+                reply = _trim(cleaned)
+        except Exception:
+            log.exception("реплика на медиа не получилась")
+        session.history.append({"role": "user", "content": note})
+        session.history.append({"role": "assistant", "content": reply})
+        trainer.persist(message.from_user.id, session)
+        await message.answer(reply)
 
 
 @router.message(F.photo)
@@ -1058,9 +1106,15 @@ async def on_photo(message: Message) -> None:
 @router.message(F.voice | F.video_note | F.sticker)
 async def on_other_media(message: Message) -> None:
     """Голосовые, видеосообщения и стикеры в проверку анкеты не нужны, а в сцене
-    у них один честный ответ: она услышит только текст."""
+    у них один честный ответ: «не загрузилось - расскажи словами»."""
     trainer = _trainer(message)
-    await _media_fallback(message, trainer)
+    if message.voice is not None:
+        kind = "голосовое сообщение"
+    elif message.video_note is not None:
+        kind = "видеосообщение"
+    else:
+        kind = "стикер"
+    await _media_fallback(message, trainer, kind)
 
 
 async def _profile_text_filter(message: Message) -> bool:
